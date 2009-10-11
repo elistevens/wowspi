@@ -10,6 +10,7 @@ import json
 import optparse
 import random
 import re
+import sqlite3
 import sys
 import time
 import urllib
@@ -18,81 +19,33 @@ import urllib2
 from PIL import Image, ImageDraw, ImageFont
 
 import combatlogparser
+import combatlogorg
+import armoryutils
 
-version = None
-htmlContent1 = """..."""
-htmlContent2 = """..."""
+#version = None
+#htmlContent1 = """..."""
+#htmlContent2 = """..."""
 
-options, arguments = None, None
 def usage(sys_argv):
-    global options, arguments
     op = optparse.OptionParser()
+    usage_setup(op)
+    combatlogorg.usage_setup(op)
+    combatlogparser.usage_setup(op)
+    armoryutils.usage_setup(op)
+    return op.parse_args(sys_argv)
 
-    op.add_option("--prune"
-            , help="Prune the resulting combats/fragments to only include those where the named actors were present (ex: 'NPC/Sartharion,NPC/Tenebron,NPC/Shadron,NPC/Vesperon').  Defaults to all T7 raid bosses."
-            , metavar="TYPE:ACTOR"
-            , dest="prune_str"
-            , action="store"
-            , type="str"
-            , default="NPC/Sartharion,NPC/Malygos,NPC/Anub'Rekhan,NPC/Grand Widow Faerlina,NPC/Maexxna,NPC/Noth the Plaguebringer,NPC/Heigan the Unclean,NPC/Loatheb," +\
-                      "NPC/Instructor Razuvious,NPC/Gothik the Harvester,NPC/Patchwerk,NPC/Grobbulus,NPC/Gluth,NPC/Thaddius,NPC/Sapphiron,NPC/Kel'Thuzad," +\
-                      "Mount/Ignis the Furnace Master,NPC/Razorscale,Mount/XT-002 Deconstructor,NPC/Steelbreaker,NPC/Kologarn,NPC/Auriya,Mount/Aerial Command Unit,Mount/Leviathan Mk II,Mount/VX-001,NPC/Thorim,NPC/Hodir,NPC/Freya",
-        )
+def usage_setup(op, **kwargs):
+    pass
+    #if kwargs.get('xxx', True):
+    #    op.add_option("--xxx"
+    #            , help="Desired output file name (excluding extension)."
+    #            , metavar="OUTPUT"
+    #            , dest="out_str"
+    #            , action="store"
+    #            , type="str"
+    #            , default="output"
+    #        )
 
-    op.add_option("--out"
-            , help="Desired output file name (excluding extension)."
-            , metavar="OUTPUT"
-            , dest="out_str"
-            , action="store"
-            , type="str"
-            , default="output"
-        )
-
-    op.add_option("--realm"
-            , help="Realm to use for armory data queries."
-            , metavar="REALM"
-            , dest="realm_str"
-            , action="store"
-            , type="str"
-            , default="Proudmoore"
-        )
-
-    op.add_option("--region"
-            , help="Region to use for armory data queries (www, eu, kr, cn, tw)."
-            , metavar="REGION"
-            , dest="region_str"
-            , action="store"
-            , type="str"
-            , default="www"
-        )
-
-    if version is None:
-        op.add_option("--ext"
-                , help="Desired output file extension (default: js)."
-                , metavar="EXTENSION"
-                , dest="ext_str"
-                , action="store"
-                , type="str"
-                , default="js"
-            )
-        op.add_option("--release"
-                , help="Freeze the script into script_vXXX.py, including html, etc."
-                , metavar="VERSION"
-                , dest="version_str"
-                , action="store"
-                , type="str"
-            )
-    else:
-        op.add_option("--ext"
-                , help="Desired output file extension (default: html)."
-                , metavar="EXTENSION"
-                , dest="ext_str"
-                , action="store"
-                , type="str"
-                , default="html"
-            )
-
-    options, arguments = op.parse_args(sys_argv)
 
 
 class Timeslice(object):
@@ -133,7 +86,7 @@ class Timeslice(object):
 
             self.event_list.append(event)
 
-            if event.get('sourceType', None) == 'PC':
+            if event['sourceType'] == 'PC':
                 if event['prefix'] in ('SWING',):
                     self.swing_dict[event['sourceName']] = 1
 
@@ -149,10 +102,10 @@ class Timeslice(object):
                     self.damage_dict[event['sourceName']] += event['amount'] - event['extra']
                     self.damageTarget_dict[event['sourceName']].add(event['destName'])
 
-            if event.get('destType', None) == 'PC' and event['suffix'] == '_DIED':
+            if event['destType'] == 'PC' and event['suffix'] == '_DIED':
                 self.died_dict[event['destName']] = 1
 
-            for actor in event.get('wound_dict', {}):
+            for actor in event['wound_dict']:
                 self.wound_dict[actor] = max(self.wound_dict[actor], event['wound_dict'][actor])
 
     #def getList(self):
@@ -163,7 +116,7 @@ class Timeslice(object):
 
 #class CombatImage(object):
 #    def __init__(self, timeslice_list, *actor_list):
-def castImage(file_path, start_time, actor_dict, actor_list=None, font_path='/Library/Fonts/Arial Bold.ttf'):
+def castImage(options, file_path, start_time, actor_dict, actor_list=None, font_path='/Library/Fonts/Arial Bold.ttf'):
 
     font = ImageFont.load_default()#ImageFont.truetype(font_path, 14, encoding="unic")
 
@@ -178,9 +131,10 @@ def castImage(file_path, start_time, actor_dict, actor_list=None, font_path='/Li
 
     image = Image.new('RGB', (int(image_width), int(image_height)))
     draw = ImageDraw.Draw(image)
-
-    armory_dict = combatlogparser.scrapeArmory(options, actor_dict)
-    color_dict = combatlogparser.classColors()
+    
+    #armory_dict = combatlogparser.scrapeArmory(options, actor_dict)
+    armory_dict = armoryutils.sqlite_scrapeCharacters(options.armorydb_path, actor_list, options.realm_str, options.region_str)
+    color_dict = armoryutils.classColors()
 
     for i in range(10):
         draw.line([(i * 100, 0), (i * 100, image_height)], fill='#333')
@@ -211,7 +165,7 @@ def castImage(file_path, start_time, actor_dict, actor_list=None, font_path='/Li
     image.save(file_path)
 
 
-def timelineImage(file_path, timeslice_list, actor_list, font_path='/Library/Fonts/Arial Bold.ttf'):
+def timelineImage(options, file_path, timeslice_list, actor_list, font_path='/Library/Fonts/Arial Bold.ttf'):
     #self.timeslice_list = timeslice_list
 
     font = ImageFont.load_default()#ImageFont.truetype(font_path, 14, encoding="unic")
@@ -265,8 +219,10 @@ def timelineImage(file_path, timeslice_list, actor_list, font_path='/Library/Fon
 
     height += wound_max * wound_scale
 
-    armory_dict = combatlogparser.scrapeArmory(options, actor_set)
-    color_dict = combatlogparser.classColors()
+    armory_dict = armoryutils.sqlite_scrapeCharacters(options.armorydb_path, actor_list + list(actor_set), options.realm_str, options.region_str)
+    color_dict = armoryutils.classColors()
+    #armory_dict = combatlogparser.scrapeArmory(options, actor_set)
+    #color_dict = combatlogparser.classColors()
 
     #print "Image size:", width, height
 
@@ -276,6 +232,7 @@ def timelineImage(file_path, timeslice_list, actor_list, font_path='/Library/Fon
     draw = ImageDraw.Draw(image)
 
     for i, timeslice in enumerate(timeslice_list):
+        #armory_dict = armoryutils.sqlite_scrapeCharacters(options.armorydb_path, timeslice.died_dict, options.realm_str, options.region_str)
         #i += 120
         if (i * timeslice.width) % 60 == 0:
             draw.line([(i, 0), (i, image.size[1])], fill='#666')
@@ -292,6 +249,7 @@ def timelineImage(file_path, timeslice_list, actor_list, font_path='/Library/Fon
 
         currentHeight = 20
         for actor in actor_list:
+            #armory_dict = armoryutils.sqlite_scrapeCharacters(options.armorydb_path, actor_list, options.realm_str, options.region_str)
 
             if i == 100:
                 draw.text((5, currentHeight + 3), actor, font=font, fill='#999')
@@ -382,8 +340,7 @@ lf = None
 color_dict = {}
 
 def main(sys_argv):
-    global options, arguments
-    usage(sys_argv)
+    options, arguments = usage(sys_argv)
 
     #print set(options.prune_str.split(','))
 
@@ -405,17 +362,31 @@ def main(sys_argv):
     raw_dict['Priest'] = tuple([x * 0.7 for x in raw_dict['Priest']])
     raw_dict['Rogue'] = tuple([x * 0.9 for x in raw_dict['Rogue']])
 
-    logFile = combatlogparser.LogFile(arguments)
-    #print repr(logFile)
-    logFile.prune(set(options.prune_str.split(',')))
+    #logFile = combatlogorg.LogFile(arguments)
+    ##print repr(logFile)
+    #logFile.prune(set(options.prune_str.split(',')))
 
-    date_str = arguments[0].split('-', 1)[1].split('.')[0]
-    file_path = "%s_" + date_str + "_%02d_%s_%s.png"
+    #date_str = arguments[0].split('-', 1)[1].split('.')[0]
+    #file_path = "%s_" + date_str + "_%02d_%s_%s.png"
 
-    for i, combat in enumerate(logFile.combat_list):
-        event_list = list(combat.eventIter())
+    if not options.db_path:
+        db_path = options.log_path + ".db"
+    else:
+        db_path = options.db_path
 
-        actor_list = [x.split('/', 1)[-1] for x in combat.getActorSet() if x.startswith('PC/')]
+    conn = sqlite3.connect(db_path, detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES)
+    conn.row_factory = sqlite3.Row
+
+    #for i, combat in enumerate(logFile.combat_list):
+    for i in [x['combat_id'] for x in conn.execute('''select distinct combat_id from event''').fetchall() if x['combat_id']]:
+        print repr(i)
+        #event_list = list(combat.eventIter())
+        event_list = conn.execute('''select * from event where combat_id = ? order by time''', (i,)).fetchall()
+        actor_list = [x['sourceName'].split('/', 1)[-1] for x in event_list if x['sourceName'] and x['sourceName'].startswith('PC/')]
+
+        file_path = "%s_" + event_list[0]['time'].strftime('+%Y-%m-%d_%H-%M-%S') + "_%02d_%s_%s.png"
+
+        #actor_list = [x.split('/', 1)[-1] for x in combat.getActorSet() if x.startswith('PC/')]
         actor_dict = {}
         for actor in actor_list:
             cast_list = [x for x in event_list if x['sourceName'] == actor and x['prefix'] == 'SPELL' and x['suffix'] in ('_CAST_START', '_CAST_SUCCESS')]
@@ -437,14 +408,15 @@ def main(sys_argv):
             #for x in sorted(delta_dict.items()):
             #    print actor, x
         if actor_dict:
-            castImage(file_path % ('CastInfo', i, re.sub('[^a-zA-Z]+', '', sorted(combat.prune_set)[0]), 'all'), list(combat.eventIter())[0]['time'], actor_dict)#, sorted(["Tantryst", "Mutagen", "Vampirion", "Ardwen", "Sameil", "Fatima", "Dusken", "Radamanthass", "Bluemorwe"]))
+            #castImage(file_path % ('CastInfo', i, re.sub('[^a-zA-Z]+', '', sorted(combat.prune_set)[0]), 'all'), list(combat.eventIter())[0]['time'], actor_dict)#, sorted(["Tantryst", "Mutagen", "Vampirion", "Ardwen", "Sameil", "Fatima", "Dusken", "Radamanthass", "Bluemorwe"]))
+            castImage(options, file_path % ('CastInfo', i, re.sub('[^a-zA-Z]+', '', 'FIXME'), 'all'), event_list[0]['time'], actor_dict)#, sorted(["Tantryst", "Mutagen", "Vampirion", "Ardwen", "Sameil", "Fatima", "Dusken", "Radamanthass", "Bluemorwe"]))
 
         timeslice_list = []
         event_list.reverse()
         while event_list:
             timeslice_list.append(Timeslice(event_list))
 
-        timelineImage(file_path % ('Timeline', i, re.sub('[^a-zA-Z]+', '', sorted(combat.prune_set)[0]), 'healer'), timeslice_list, sorted(["Tantryst", "Mutagen", "Vampirion", "Ardwen", "Sameil", "Fatima", "Dusken", "Radamanthass", "Bluemorwe"]))
+        timelineImage(options, file_path % ('Timeline', i, re.sub('[^a-zA-Z]+', '', 'FIXME'), 'healer'), timeslice_list, sorted(["Tantryst", "Aurastraza", "Detty", "Burlyn", "Daliah", "Mutagen", "Vampirion", "Ardwen", "Sameil", "Fatima", "Dusken", "Radamanthass", "Radanepenthe", "Bluemorwe"]))
         #for class_str in classColors():
         #    armory_dict = scrapeArmory()
         #    player_list = [k for (k, v) in armory_dict.items() if v['class'] == class_str]

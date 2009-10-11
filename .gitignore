@@ -1,3 +1,5 @@
 wowspi.kpf
 *.db
 *.txt
+*.pyc
+*.png

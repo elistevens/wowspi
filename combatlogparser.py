@@ -18,12 +18,39 @@ import urllib2
 
 
 
+def adapt_json(d):
+    import json
+    return json.dumps(d, separators=(',',':'))
+
+def convert_json(s):
+    import json
+    return json.loads(s)
+
+# Register the adapter
+sqlite3.register_adapter(dict, adapt_json)
+sqlite3.register_adapter(list, adapt_json)
+
+# Register the converter
+sqlite3.register_converter("json", convert_json)
+
+
+
 def usage(sys_argv):
     op = optparse.OptionParser()
     usage_setup(op)
     return op.parse_args(sys_argv)
 
 def usage_setup(op, **kwargs):
+    if kwargs.get('db', True):
+        op.add_option("--db"
+                , help="Desired sqlite database output file name."
+                , metavar="OUTPUT"
+                , dest="db_path"
+                , action="store"
+                , type="str"
+                #, default="output"
+            )
+
     if kwargs.get('log', True):
         op.add_option("--log"
                 , help="Path to the WoWCombatLog.txt file."
@@ -34,15 +61,6 @@ def usage_setup(op, **kwargs):
                 #, default="output"
             )
         
-    if kwargs.get('db', True):
-        op.add_option("--db"
-                , help="Desired sqlite database output file name."
-                , metavar="OUTPUT"
-                , dest="db_path"
-                , action="store"
-                , type="str"
-                #, default="output"
-            )
     
 
 
@@ -195,16 +213,23 @@ def parseRow(row):
 
 
 def sqlite_parseLog(db_path, log_path, force=False):
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES)
+    conn.row_factory = sqlite3.Row
 
     if not force:
+        #print "trying to skip..."
         try:
-            if conn.execute('''select count(*) from event''').fetchone()[0] > 0:
+            #print conn.execute('''select count(*) from event where path = ?''', (db_path,)).fetchone(), conn.execute('''select count(*) from event''').fetchone()
+            if conn.execute('''select count(*) from event where path = ?''', (log_path,)).fetchone()[0] > 0:
+            #if conn.execute('''select count(*) from event''').fetchone()[0] > 0:
+                #print "skipping..."
                 return
-        except:
+        except Exception, e:
+            #print e
             pass
 
-    col_list = list(fixed_list)
+    #col_list = ['time', 'eventType', 'prefix', 'suffix'] + list(fixed_list)
+    col_list = []
     for prefix_tup in prefix_list:
         for col in prefix_tup[1]:
             if col not in col_list:
@@ -214,13 +239,23 @@ def sqlite_parseLog(db_path, log_path, force=False):
             col = col.lstrip('?')
             if col not in col_list:
                 col_list.append(col)
+                
+    col_list.sort()
+                
+    col_list = ['time', 'eventType', 'prefix', 'suffix', 'sourceType', 'destType'] + list(fixed_list) + col_list
+
+
+    #print col_list
 
     col_str = ', '.join(col_list)
     qmk_str = ', '.join(['?' for x in col_list])
     insert_str = '''insert into event (path, %s) values (?, %s)''' % (col_str, qmk_str)
 
     conn.execute('''drop table if exists event''')
-    conn.execute('''create table event (id integer primary key, path, %s)''' % col_str)
+    
+    #print ('''create table event (id integer primary key, path, %s, fragment_id int, combat_id int, wound_dict json, active_dict json)''' % col_str).replace('time,', 'time timestamp,',)
+    
+    conn.execute(('''create table event (id integer primary key, path, %s, fragment_id int, combat_id int, wound_dict json, active_dict json)''' % col_str).replace('time,', 'time timestamp,',))
 
     # FIXME: 'file' should be some flavor of 'codecs.open' for int'l regions
     for row in csv.reader(file(log_path)):
@@ -239,7 +274,7 @@ def main(sys_argv):
     else:
         db_path = options.db_path
 
-    print "Parsing %s --> %s" % (options.log_path, db_path)
+    print datetime.datetime.now(), "Parsing %s --> %s" % (options.log_path, db_path)
     sqlite_parseLog(db_path, options.log_path, True)
 
 

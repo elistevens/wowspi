@@ -32,7 +32,7 @@ def usage_setup(op, **kwargs):
                 , dest="armorydb_path"
                 , action="store"
                 , type="str"
-                #, default="output"
+                , default="armory.db"
             )
 
     if kwargs.get('realm', True):
@@ -57,25 +57,31 @@ def usage_setup(op, **kwargs):
 
 
 
-armoryField_list = ['name', 'class', 'race', 'level', 'guildName', 'faction', 'gender', 'race']
+armoryField_list = ['name', 'class', 'level', 'guildName', 'faction', 'gender', 'race']
 
 def sqlite_scrapeCharacters(db_path, name_list, realm_str, region_str, maxAge_td=datetime.timedelta(14), force=False):
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES)
+    conn.row_factory = sqlite3.Row
     
     try:
-        row_list = conn.execute('''select name from toon where updatedAt > ?''', datetime.datetime.now() - maxAge_td)
-    except:
+        row_list = conn.execute('''select name from toon where updatedAt > ?''', (datetime.datetime.now() - maxAge_td,))
+        print "row_list", row_list
+    except Exception, e:
+        print "Dropping...", e
         row_list = []
         conn.execute('''drop table if exists toon''')
-        conn.execute('''create table toon (id integer primary key, updatedAt, %s, specName1, specPoints1, specName2, specPoints2)''' % ', '.join(armoryField_list))
+        conn.execute('''create table toon (id integer primary key, updatedAt timestamp, %s, specName1, specPoints1, specName2, specPoints2)''' % ', '.join(armoryField_list))
         
     name_set = set()
     for row in row_list:
         name_set.add(row['name'])
     
-    for name_str in name_list:
+    print "name_list, name_set:", name_list, name_set
+    for name_str in name_list or []:
         if name_str not in name_set:
             armory_dict = dict_scrapeCharacter(name_str, realm_str, region_str)
+            
+            #print armory_dict
             
             if armory_dict:
                 colval_list = list(armory_dict.items())
@@ -83,21 +89,29 @@ def sqlite_scrapeCharacters(db_path, name_list, realm_str, region_str, maxAge_td
                 col_list = [x[0] for x in colval_list]
                 val_list = [x[1] for x in colval_list]
                 
-                conn.execute('''insert into toon (%s) values (%s) ''' % (', '.join(col_list), ', '.join(['?' for x in col_list])), tuple(val_list))
+                conn.execute('''insert into toon (updatedAt, %s) values (?, %s) ''' % (', '.join(col_list), ', '.join(['?' for x in col_list])), tuple([datetime.datetime.now()] + val_list))
     conn.commit()
     
+    return dict([(x['name'], x) for x in conn.execute('''select * from toon''').fetchall()])
     
     
-def dict_scrapeCharacter(name, realm, region):
+    
+def dict_scrapeCharacter(name_str, realm_str, region_str):
     armory_dict = {}
     try:
         opener = urllib2.build_opener()
         opener.addheaders = [('User-agent', 'Mozilla/5.0 (Macintosh; U; Intel Mac OS X; en-US; rv:1.8.1.6) Gecko/20070725 Firefox/2.0.0.6')]
         
+        time.sleep(5)
         xml_str = opener.open("http://%s.wowarmory.com/character-sheet.xml?r=%s&n=%s" % (region_str, realm_str, name_str)).read()
         armory_xml = xml.etree.ElementTree.XML(xml_str)
         
-        character_elem = armory_xml.find('character')
+        #print "http://%s.wowarmory.com/character-sheet.xml?r=%s&n=%s" % (region_str, realm_str, name_str)
+        #print armory_xml, list(armory_xml.getchildren())
+        
+        character_elem = armory_xml.find('characterInfo').find('character')
+        
+        #print character_elem, character_elem.attrib
         
         for col_str in armoryField_list:
             try:
@@ -105,14 +119,16 @@ def dict_scrapeCharacter(name, realm, region):
             except:
                 pass
             
-        for talent_elem in armory_xml.findall():
+        for talent_elem in armory_xml.find('characterInfo').find('characterTab').find('talentSpecs').findall('talentSpec'):
             index_str = talent_elem.get('group')
             
             armory_dict['specName' + index_str] = talent_elem.get('prim')
             armory_dict['specPoints' + index_str] = '/'.join([talent_elem.get('tree' + x) for x in ('One', 'Two', 'Three')])
 
         return armory_dict
-    except:
+    except Exception, e:
+        print e
+        #raise
         return {}
 
 
