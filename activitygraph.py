@@ -7,6 +7,7 @@ import csv
 import datetime
 import itertools
 import json
+import math
 import optparse
 import random
 import re
@@ -66,6 +67,8 @@ class Timeslice(object):
         self.healTarget_dict = collections.defaultdict(set)
         self.damageTarget_dict = collections.defaultdict(set)
         #self.next = None
+        
+        self.id_set = set()
 
         #event_iter = iter(event_list)
 
@@ -85,6 +88,7 @@ class Timeslice(object):
                 break
 
             self.event_list.append(event)
+            self.id_set.add(event['id'])
 
             if event['sourceType'] == 'PC':
                 if event['prefix'] in ('SWING',):
@@ -105,8 +109,22 @@ class Timeslice(object):
             if event['destType'] == 'PC' and event['suffix'] == '_DIED':
                 self.died_dict[event['destName']] = 1
 
-            for actor in event['wound_dict']:
+            for actor in event['wound_dict'] or {}:
                 self.wound_dict[actor] = max(self.wound_dict[actor], event['wound_dict'][actor])
+                
+    def getTotalDamage(self, conn, **kwargs):
+        select_str = '''select sum(amount) amount, sum(extra) extra from event where '''
+        where_list = ['''id in (%s)''' % ','.join([str(x) for x in self.id_set]), '''suffix = "_DAMAGE"''']
+        arg_list = []
+        for k, v in kwargs.items():
+            if isinstance(v, str):
+                where_list.append('''%s = ?''' % k)
+                arg_list.append(v)
+            else:
+                where_list.append('''%s in ?''' % k)
+                arg_list.append(v)
+        
+        row = conn.execute(select_str + ' and '.join(where_list), tuple(arg_list)).fetchone()
 
     #def getList(self):
     #    if self.next:
@@ -339,95 +357,296 @@ lf = None
 
 color_dict = {}
 
-def main(sys_argv):
-    options, arguments = usage(sys_argv)
 
-    #print set(options.prune_str.split(','))
+class Timeline(object):
+    def __init__(self, conn, start_dt, end_dt, width=0.2):
+        self.conn = conn
+        self.start_dt = start_dt
+        self.end_dt = end_dt
+        self.setWidth(width)
+        
+        #max_dt = self.start_time
+        #
+        #for event in event_list:
+        #    if event['time'] >= max_dt:
+        #        self.slice_list.append(Timeslice2(max_dt, width_td))
+        #        max_dt += width_td
+        #        
+        #    self.slice_list[-1].addEvent(event)
+            
+    def __len__(self):
+        len_td = self.end_dt - self.start_dt
+        return int(math.ceil((len_td.seconds + len_td.microseconds / 1000000.0) / (self.width_td.seconds + self.width_td.microseconds / 1000000.0)))
 
-    global color_dict
-    raw_dict = {
-            'Death Knight': (0.77 , 0.12 , 0.23 ),
-            'Druid': (1.00 , 0.49 , 0.04 ),
-            'Hunter': (0.67 , 0.83 , 0.45 ),
-            'Mage': (0.41 , 0.80 , 0.94 ),
-            'Paladin': (0.96 , 0.55 , 0.73 ),
-            'Priest': (1.00 , 1.00 , 1.00 ),
-            'Rogue': (1.00 , 0.96 , 0.41 ),
-            'Shaman': (0.14 , 0.35 , 1.00 ),
-            'Warlock': (0.58 , 0.51 , 0.79 ),
-            'Warrior': (0.78 , 0.61 , 0.43 ),
-            'NPC': (0.50 , 0.40 , 0.10 ),
-        }
 
-    raw_dict['Priest'] = tuple([x * 0.7 for x in raw_dict['Priest']])
-    raw_dict['Rogue'] = tuple([x * 0.9 for x in raw_dict['Rogue']])
+    def setWidth(self, width=0.2):
+        """'width' is a timespan if a float; otherwise it's a fixed number of buckets (presumed int)."""
+        if isinstance(width, float):
+            self.width_td = datetime.timedelta(seconds=width)
+        else:
+            len_td = self.end_dt - self.start_dt
+            self.width_td = datetime.timedelta(seconds=((len_td.seconds + len_td.microseconds / 1000000.0) / width))
+            #(self.end_dt - self.start_dt) * (1 / float(width))
 
-    #logFile = combatlogorg.LogFile(arguments)
-    ##print repr(logFile)
-    #logFile.prune(set(options.prune_str.split(',')))
 
-    #date_str = arguments[0].split('-', 1)[1].split('.')[0]
-    #file_path = "%s_" + date_str + "_%02d_%s_%s.png"
+    def containsTime(self, check_dt):
+        return self.start_dt <= check_dt and self.end_dt > check_dt
+        
+    def getEventData(self, index, select_str='*', where_list=None, **kwargs):
+        """
+        Examples of use:
+            Total healing done to PCs:
+            lambda timeline, index: timeline.getEventData(index, 'sum(amount) - sum(extra)', suffix='_HEAL', destType='PC').fetchone()[0]
 
-    if not options.db_path:
-        db_path = options.log_path + ".db"
-    else:
-        db_path = options.db_path
+            Total healing done to Bosses (like at Vezax):
+            lambda timeline, index: timeline.getEventData(index, 'sum(amount) - sum(extra)', suffix='_HEAL', destType='NPC').fetchone()[0]
+            
+            If a given player cast something:
+            lambda timeline, index: timeline.getEventData(index, 'count(*)', suffix=('_CAST_START', '_CAST_SUCCESS'), sourceName='Tantryst').fetchone()[0] != 0
+        """
+        if where_list is None:
+            where_list = []
+        
+        where_list.append(('''time >= ?''', self.start_dt + (self.width_td * index)))
+        where_list.append(('''time < ?''',  self.start_dt + (self.width_td * (index+1))))
 
-    conn = sqlite3.connect(db_path, detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES)
-    conn.row_factory = sqlite3.Row
+        sql_list = []
+        arg_list = []
+        for tup in where_list:
+            sql_list.append(tup[0])
+            if len(tup) > 1:
+                arg_list.append(tup[1])
+            
+        for k, v in kwargs.items():
+            if isinstance(v, tuple):
+                sql_list.append('''%s in ?''' % k)
+                arg_list.append(v)
+            else:
+                sql_list.append('''%s = ?''' % k)
+                arg_list.append(v)
+        #if index % 500 == 0:
+        #    print ('''select %s from event where ''' % select_str) + ' and '.join(sql_list), tuple(arg_list)
+        return self.conn.execute(('''select %s from event where ''' % select_str) + ' and '.join(sql_list), tuple(arg_list))
 
-    #for i, combat in enumerate(logFile.combat_list):
-    for i in [x['combat_id'] for x in conn.execute('''select distinct combat_id from event''').fetchall() if x['combat_id']]:
-        print repr(i)
-        #event_list = list(combat.eventIter())
-        event_list = conn.execute('''select * from event where combat_id = ? order by time''', (i,)).fetchall()
-        actor_list = [x['sourceName'].split('/', 1)[-1] for x in event_list if x['sourceName'] and x['sourceName'].startswith('PC/')]
+class Region(object):
+    def __init__(self, timeline, label_str, graph_list, width, height, parent_region=None, parent_relationship='under'):
+        self.timeline = timeline
+        self.label_str = label_str
+        self.graph_list = graph_list
+        self.parent_region = parent_region
+        self.parent_relationship = parent_relationship
+        
+        self.max_value = 0
+        for graph in self.graph_list:
+            for index in range(len(timeline)):
+                #if index % 100 == 0:
+                #    print datetime.datetime.now(), index
+                self.max_value = float(max(self.max_value, graph.getValue(timeline, index)))
+                
+        self.width = width
+        if isinstance(height, float):
+            self.height = int(math.ceil(self.max_value * height))
+        else:
+            self.height = int(height)
+            
+    def render(self, draw):
+        for graph in self.graph_list:
+            #print "..."
+            graph.render(draw, self)
+        
+        draw.text((self.getTop() + 5, self.getLeft() + 3), self.label_str, font=ImageFont.load_default(), fill='#999')
 
-        file_path = "%s_" + event_list[0]['time'].strftime('+%Y-%m-%d_%H-%M-%S') + "_%02d_%s_%s.png"
 
-        #actor_list = [x.split('/', 1)[-1] for x in combat.getActorSet() if x.startswith('PC/')]
-        actor_dict = {}
-        for actor in actor_list:
-            cast_list = [x for x in event_list if x['sourceName'] == actor and x['prefix'] == 'SPELL' and x['suffix'] in ('_CAST_START', '_CAST_SUCCESS')]
+    def getTop(self):
+        if self.parent_region:
+            if self.parent_relationship in ('under',):
+                return self.parent_region.getBottom()
+            #elif self.parent_relationship in ('tl_child', 'tr_child'):
+            #    return self.parent_region.getBottom()
+        else:
+            return 0
+        
+    def getBottom(self):
+        return self.getTop() + self.height
+        
+    def getLeft(self):
+        if self.parent_region:
+            if self.parent_relationship in ('under', 'tl_child'):
+                return self.parent_region.getLeft()
+            #elif self.parent_relationship in ('tr_child',):
+            #    return self.parent_region.getRight() - self.width
+                
+        else:
+            return 0
 
-            if cast_list:
-                delta_list = []
-                last = cast_list.pop(0)
-                for event in cast_list:
-                    delta_list.append(event['time'] - last['time'])
-                    last = event
+    def getRight(self):
+        return self.getLeft() + self.width
+        
 
-                delta_dict = collections.defaultdict(int)
-                for delta in delta_list:
-                    bucket_int = int(float(delta.seconds + delta.microseconds / 1000000.0) * 10)
-                    if bucket_int < 100:
-                        delta_dict[bucket_int] += 1
 
-                actor_dict[actor] = delta_dict
-            #for x in sorted(delta_dict.items()):
-            #    print actor, x
-        if actor_dict:
-            #castImage(file_path % ('CastInfo', i, re.sub('[^a-zA-Z]+', '', sorted(combat.prune_set)[0]), 'all'), list(combat.eventIter())[0]['time'], actor_dict)#, sorted(["Tantryst", "Mutagen", "Vampirion", "Ardwen", "Sameil", "Fatima", "Dusken", "Radamanthass", "Bluemorwe"]))
-            castImage(options, file_path % ('CastInfo', i, re.sub('[^a-zA-Z]+', '', 'FIXME'), 'all'), event_list[0]['time'], actor_dict)#, sorted(["Tantryst", "Mutagen", "Vampirion", "Ardwen", "Sameil", "Fatima", "Dusken", "Radamanthass", "Bluemorwe"]))
+class Graph(object):
+    def __init__(self, render_str, color_str, value_func, decay=0.0):
+        self.render_str = render_str
+        self.color_str = color_str
+        self.value_func = value_func
+        self.decay = decay
+        
+    def getValue(self, timeline, index):
+        return self.value_func(timeline, index)
+        
+    def render(self, draw, region):
+        old_value = 0.0
+        for i in range(len(region.timeline)):
+            #try:
+            #    value = float(self.getValue(region.timeline, i)) / region.max_value * region.height
+            #except:
+            #    print repr(self.getValue(region.timeline, i))
+            #    raise
+            
+            value = float(self.getValue(region.timeline, i))
+            #print 'a', value
+            value = value / region.max_value * region.height
+            #print 'b', value
+            value = (1-self.decay) * value + (self.decay) * old_value
+            #print 'c', value
+            old_value = value
+            
+            
+            if self.render_str == 'uppoint':
+                draw.point((i + region.getLeft(), region.getBottom() - value), fill=self.color_str)
+            elif self.render_str == 'upline':
+                draw.line([(i + region.getLeft(), region.getBottom() - value), (i + region.getLeft(), region.getBottom())], fill=self.color_str)
+            elif self.render_str == 'downpoint':
+                draw.point((i + region.getLeft(), region.getTop() + value), fill=self.color_str)
+            elif self.render_str == 'downline':
+                draw.line([(i + region.getLeft(), region.getTop() + value), (i + region.getLeft(), region.getTop())], fill=self.color_str)
+            elif self.render_str == 'vbar':
+                if value > 0:
+                    draw.line([(i + region.getLeft(), region.getBottom()), (i + region.getLeft(), region.getTop())], fill=self.color_str)
 
-        timeslice_list = []
-        event_list.reverse()
-        while event_list:
-            timeslice_list.append(Timeslice(event_list))
+    
 
-        timelineImage(options, file_path % ('Timeline', i, re.sub('[^a-zA-Z]+', '', 'FIXME'), 'healer'), timeslice_list, sorted(["Tantryst", "Aurastraza", "Detty", "Burlyn", "Daliah", "Mutagen", "Vampirion", "Ardwen", "Sameil", "Fatima", "Dusken", "Radamanthass", "Radanepenthe", "Bluemorwe"]))
-        #for class_str in classColors():
-        #    armory_dict = scrapeArmory()
-        #    player_list = [k for (k, v) in armory_dict.items() if v['class'] == class_str]
-        #    combatImage(file_path % (i, re.sub('[^a-zA-Z]+', '', sorted(combat.prune_set)[0]), class_str.replace(' ', '')), timeslice_list, sorted(player_list))
+def main(sys_argv, options, arguments):
+    combatlogorg.main(sys_argv, options, arguments)
+    conn = combatlogparser.sqlite_connection(options)
+    
+    print datetime.datetime.now(), "Iterating over combat images..."
+    for combat in conn.execute('''select * from combat order by start_event_id''').fetchall():
 
+        # This way gives us strings, not datetimes.
+        #start_dt, end_dt = conn.execute('''select min(time) a, max(time) b from event where combat_id = ?''', (combat['id'],)).fetchone()
+        time_list = [x['time'] for x in conn.execute('''select time from event where combat_id = ?''', (combat['id'],)).fetchall()]
+        start_dt = min(time_list)
+        end_dt = max(time_list)
+        #print start_dt, repr(start_dt)
+        
+        timeline = Timeline(conn, start_dt, end_dt, width=0.5)
+        
+        print datetime.datetime.now(), "len(timeline):", len(timeline)
+        
+        graph_list = []
+        graph_list.append(Graph('upline', '#ff0', lambda timeline, index: timeline.getEventData(index, 'sum(amount)', suffix='_HEAL', destType='PC').fetchone()[0] or 0))
+        graph_list.append(Graph('upline', '#0f0', lambda timeline, index: timeline.getEventData(index, 'sum(amount) - sum(extra)', suffix='_HEAL', destType='PC').fetchone()[0] or 0))
+        #graph_list.append(Graph('upline', '#0f0', lambda timeline, index: timeline.getEventData(index, 'sum(amount) - sum(extra)', suffix='_DAMAGE', sourceType='PC').fetchone()[0] or 0))
+        
+        print datetime.datetime.now(), "Before region..."
+        
+        region = Region(timeline, "Testing...", graph_list, len(timeline), 500)
+        
+        
+    
+        image = Image.new('RGB', (int(len(timeline)), int(region.height)))
+        draw = ImageDraw.Draw(image)
+        
+        print datetime.datetime.now(), "Before render..."
+
+        region.render(draw)
+        
+        image.save('test_%s.png' % combat['id'])
+        
         #break
+    
+    
 
+    ##print set(options.prune_str.split(','))
+    #
+    #global color_dict
+    #raw_dict = {
+    #        'Death Knight': (0.77 , 0.12 , 0.23 ),
+    #        'Druid': (1.00 , 0.49 , 0.04 ),
+    #        'Hunter': (0.67 , 0.83 , 0.45 ),
+    #        'Mage': (0.41 , 0.80 , 0.94 ),
+    #        'Paladin': (0.96 , 0.55 , 0.73 ),
+    #        'Priest': (1.00 , 1.00 , 1.00 ),
+    #        'Rogue': (1.00 , 0.96 , 0.41 ),
+    #        'Shaman': (0.14 , 0.35 , 1.00 ),
+    #        'Warlock': (0.58 , 0.51 , 0.79 ),
+    #        'Warrior': (0.78 , 0.61 , 0.43 ),
+    #        'NPC': (0.50 , 0.40 , 0.10 ),
+    #    }
+    #
+    #raw_dict['Priest'] = tuple([x * 0.7 for x in raw_dict['Priest']])
+    #raw_dict['Rogue'] = tuple([x * 0.9 for x in raw_dict['Rogue']])
+    #
+    ##logFile = combatlogorg.LogFile(arguments)
+    ###print repr(logFile)
+    ##logFile.prune(set(options.prune_str.split(',')))
+    #
+    ##date_str = arguments[0].split('-', 1)[1].split('.')[0]
+    ##file_path = "%s_" + date_str + "_%02d_%s_%s.png"
+    #
+    ##for i, combat in enumerate(logFile.combat_list):
+    #for i in [x['combat_id'] for x in conn.execute('''select distinct combat_id from event''').fetchall() if x['combat_id']]:
+    #    print repr(i)
+    #    #event_list = list(combat.eventIter())
+    #    event_list = conn.execute('''select * from event where combat_id = ? order by time''', (i,)).fetchall()
+    #    actor_list = [x['sourceName'].split('/', 1)[-1] for x in event_list if x['sourceName'] and x['sourceName'].startswith('PC/')]
+    #
+    #    file_path = "%s_" + event_list[0]['time'].strftime('%Y-%m-%d_%H-%M-%S') + "_%02d_%s_%s.png"
+    #
+    #    #actor_list = [x.split('/', 1)[-1] for x in combat.getActorSet() if x.startswith('PC/')]
+    #    actor_dict = {}
+    #    for actor in actor_list:
+    #        cast_list = [x for x in event_list if x['sourceName'] == actor and x['prefix'] == 'SPELL' and x['suffix'] in ('_CAST_START', '_CAST_SUCCESS')]
+    #
+    #        if cast_list:
+    #            delta_list = []
+    #            last = cast_list.pop(0)
+    #            for event in cast_list:
+    #                delta_list.append(event['time'] - last['time'])
+    #                last = event
+    #
+    #            delta_dict = collections.defaultdict(int)
+    #            for delta in delta_list:
+    #                bucket_int = int(float(delta.seconds + delta.microseconds / 1000000.0) * 10)
+    #                if bucket_int < 100:
+    #                    delta_dict[bucket_int] += 1
+    #
+    #            actor_dict[actor] = delta_dict
+    #        #for x in sorted(delta_dict.items()):
+    #        #    print actor, x
+    #    if actor_dict:
+    #        #castImage(file_path % ('CastInfo', i, re.sub('[^a-zA-Z]+', '', sorted(combat.prune_set)[0]), 'all'), list(combat.eventIter())[0]['time'], actor_dict)#, sorted(["Tantryst", "Mutagen", "Vampirion", "Ardwen", "Sameil", "Fatima", "Dusken", "Radamanthass", "Bluemorwe"]))
+    #        castImage(options, file_path % ('CastInfo', i, re.sub('[^a-zA-Z]+', '', 'FIXME'), 'all'), event_list[0]['time'], actor_dict)#, sorted(["Tantryst", "Mutagen", "Vampirion", "Ardwen", "Sameil", "Fatima", "Dusken", "Radamanthass", "Bluemorwe"]))
+    #
+    #    timeslice_list = []
+    #    event_list.reverse()
+    #    while event_list:
+    #        timeslice_list.append(Timeslice(event_list))
+    #
+    #    timelineImage(options, file_path % ('Timeline', i, re.sub('[^a-zA-Z]+', '', 'FIXME'), 'healer'), timeslice_list, sorted(["Tantryst", "Aurastraza", "Detty", "Burlyn", "Daliah", "Mutagen", "Vampirion", "Ardwen", "Sameil", "Fatima", "Dusken", "Radamanthass", "Radanepenthe", "Bluemorwe"]))
+    #    #for class_str in classColors():
+    #    #    armory_dict = scrapeArmory()
+    #    #    player_list = [k for (k, v) in armory_dict.items() if v['class'] == class_str]
+    #    #    combatImage(file_path % (i, re.sub('[^a-zA-Z]+', '', sorted(combat.prune_set)[0]), class_str.replace(' ', '')), timeslice_list, sorted(player_list))
+    #
+    #    #break
+    #
 
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]) or 0)
+    options, arguments = usage(sys.argv[1:])
+    sys.exit(main(sys.argv[1:], options, arguments) or 0)
 
 # eof

@@ -41,6 +41,16 @@ def usage(sys_argv):
     return op.parse_args(sys_argv)
 
 def usage_setup(op, **kwargs):
+    if kwargs.get('force', True):
+        op.add_option("--force"
+                , help="Force reparsing from scratch."
+                #, metavar="OUTPUT"
+                , dest="force"
+                , action="store_true"
+                #, type="str"
+                #, default="output"
+            )
+
     if kwargs.get('db', True):
         op.add_option("--db"
                 , help="Desired sqlite database output file name."
@@ -212,10 +222,7 @@ def parseRow(row):
 
 
 
-def sqlite_parseLog(db_path, log_path, force=False):
-    conn = sqlite3.connect(db_path, detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES)
-    conn.row_factory = sqlite3.Row
-
+def sqlite_parseLog(conn, log_path, force=False):
     if not force:
         #print "trying to skip..."
         try:
@@ -255,7 +262,8 @@ def sqlite_parseLog(db_path, log_path, force=False):
     
     #print ('''create table event (id integer primary key, path, %s, fragment_id int, combat_id int, wound_dict json, active_dict json)''' % col_str).replace('time,', 'time timestamp,',)
     
-    conn.execute(('''create table event (id integer primary key, path, %s, fragment_id int, combat_id int, wound_dict json, active_dict json)''' % col_str).replace('time,', 'time timestamp,',))
+    conn.execute(('''create table event (id integer primary key, path, %s)''' % col_str).replace('time,', 'time timestamp,',))
+    conn.execute('''create index ndx_time on event (time)''')
 
     # FIXME: 'file' should be some flavor of 'codecs.open' for int'l regions
     for row in csv.reader(file(log_path)):
@@ -264,24 +272,36 @@ def sqlite_parseLog(db_path, log_path, force=False):
         
     conn.commit()
 
+def sqlite_connection(options):
+    conn = sqlite3.connect(options.db_path, detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES)
+    conn.row_factory = sqlite3.Row
+    
+    return conn
+    
+def sqlite_insureColumns(conn, table_str, column_list):
+    col_set = set(conn.execute('''select * from %s limit 1''' % table_str).fetchone().keys())
+    
+    for col_str, def_str in column_list:
+        if col_str not in col_set:
+            conn.execute('''alter table %s add column %s %s''' % (table_str, col_str, def_str))
+            
 
+def main(sys_argv, options, arguments):
+    #if not options.db_path:
+    #    db_path = options.log_path + ".db"
+    #else:
+    #    db_path = options.db_path
 
-def main(sys_argv):
-    options, arguments = usage(sys_argv)
-
-    if not options.db_path:
-        db_path = options.log_path + ".db"
-    else:
-        db_path = options.db_path
-
-    print datetime.datetime.now(), "Parsing %s --> %s" % (options.log_path, db_path)
-    sqlite_parseLog(db_path, options.log_path, True)
+    print datetime.datetime.now(), "Parsing %s --> %s" % (options.log_path, options.db_path)
+    conn = sqlite_connection(options)
+    sqlite_parseLog(conn, options.log_path, options.force)
 
 
 
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]) or 0)
+    options, arguments = usage(sys_argv)
+    sys.exit(main(sys.argv[1:], options, arguments) or 0)
 
 # eof
