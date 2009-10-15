@@ -55,13 +55,18 @@ class LogSegment(object):
         #self.aggregate_dict = {}
         self.actor_set = set()
         self.db_id = 0
+        
+        #self.seenCombat_bool = False
 
     def addEvent(self, event):
         #if prefix_dict[event['prefix']][0] and suffix_dict[event['suffix']][0]:
             self.event_list.append(event)
 
-            if not self.npcEvent and event['sourceType'] == 'NPC':
-                self.npcEvent = event
+            if not self.npcEvent:
+                if event['sourceType'] == 'NPC' and event['destType'] == 'PC':
+                    self.npcEvent = event
+                elif event['sourceType'] == 'PC' and event['destType'] == 'NPC' and event['suffix'] == '_DAMAGE':
+                    self.npcEvent = event
 
             if event['eventType'] == 'UNIT_DIED' and event['destType'] == 'PC':
                 self.closeEvent = event
@@ -101,8 +106,10 @@ class LogSegment(object):
     #    return self.event_list[-1]
 
     def prune(self, require_set):
-        #print [x for x in sorted(self.actor_set) if not x.startswith('PC/')]
-        return require_set.intersection(self.actor_set)
+        if self.npcEvent:
+            return require_set.intersection(self.actor_set)
+        else:
+            return set()
 
     def __repr__(self):
         return "<LogSegment %s> %s - %s" % (self.db_id, self.event_list[0]['time'], self.event_list[-1]['time'])
@@ -145,6 +152,7 @@ class LogCombat(object):
         for x in self.segment_list:
             self.prune_set.update(x.prune(require_set))
 
+        #print self.segment_list, self.prune_set
         return self.segment_list
 
     def finalizeClose(self, conn, require_set):
@@ -233,6 +241,19 @@ def main(sys_argv, options, arguments):
         require_set.add('NPC/' + name_str)
         require_set.add('Mount/' + name_str)
     combat_list = [combat for combat in combat_list if combat.prune(require_set)]
+    #tmp_list = []
+    #for combat in combat_list:
+    #    if combat.prune(require_set):
+    #        tmp_list.append(combat)
+    #        
+    #    if len(tmp_list) >= 5:
+    #        print combat.segment_list[0].event_list[0], combat.segment_list[0].event_list[-1]
+    #        print combat.segment_list[0].closeEvent
+    #        print combat.segment_list[0].npcEvent
+    #        print combat.segment_list[0].prune(require_set)
+    #        
+    #        break
+    #combat_list = tmp_list
     
     print datetime.datetime.now(), "Saving to %s" % (options.db_path,)
     for combat in combat_list:

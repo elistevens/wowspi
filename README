@@ -1,0 +1,45 @@
+h1. Overview
+
+At the core, wowspi provides the ability to turn a WoWCombatLog.txt log file into a sqlite database with a fairly pure representation of the raw combat log events contained therein.  Currently, some additional columns are added to ease use with some of the other tools in the suite, but the long-term goal is to have the additional columns added in dynamically if and when they are needed.
+
+wowspi needs the following:
+* Python 2.6+, untested on higher - "http://www.python.org/":http://www.python.org/
+* Python Imaging Library (PIL) 1.1.6 - "http://www.pythonware.com/products/pil/":http://www.pythonware.com/products/pil/
+
+h2. Healing Graphs
+
+Check out the activitygraph.py file for its ability to create timelines that show your healers' activity, effective and over healing, and the current amount of raid damage awaiting heals.
+
+For example, this is a thumbnail of a recent Firefighter (10) kill:
+!http://www.gtguild.net/logs/Timeline_2009-10-05_23-37-11_08_Firefighter_healer_thumb.png!
+"Full Image":http://www.gtguild.net/logs/Timeline_2009-10-05_23-37-11_08_Firefighter_healer.png
+
+h2. Cast Interval Graphs
+
+activitygraph.py can also chart out time between spell casts.  This helps identify sloppy rotations.
+
+h1. Future Directions
+
+h2. More Graphs
+
+I'd like to have the project be able to produce fight time line graphs similar to what EHFS and World of Logs can produce.  This should simply be a matter of coding them - I don't think that there's any fundamental changes that need to be made.
+
+h2. StasisCL / ApoStasis Integration
+
+"http://code.google.com/p/apostasis/":http://code.google.com/p/apostasis/
+
+I like stasis for its ability to be run from the CLI, as well as the highly detailed nature of the data it provides.  However I think that data visualization is a weak point of the package.  I'd like to be able to take wowspi-derived charts and graphs and be able to insert them into the generated HTML from stasis.
+
+h1. About
+
+h2. Author
+
+The author can be found playing "Tantryst":http://www.wowarmory.com/character-sheet.xml?r=Proudmoore&n=tantryst on US-Proudmoore, and is the guild leader of &lt;Game Theory&gt;: "http://www.gtguild.net":http://www.gtguild.net
+
+h2. Contributions
+
+Contributions welcome.  I'm using this project as an excuse to learn how to use github; don't be shy (thought I might be slow to respond, we'll see).
+
+h2. Project Name
+
+The project name wowspi is pronounced "wow-spy"; named so for its ability to peer into the game, as well as for what Sierra Pacific Industries does to logs.  Look it up.

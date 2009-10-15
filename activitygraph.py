@@ -389,8 +389,11 @@ class Timeline(object):
             #(self.end_dt - self.start_dt) * (1 / float(width))
 
 
-    def containsTime(self, check_dt):
-        return self.start_dt <= check_dt and self.end_dt > check_dt
+    def containsTime(self, check_dt, index=None):
+        if index is None:
+            return self.start_dt <= check_dt and self.end_dt > check_dt
+        else:
+            return (self.start_dt + (self.width_td * index)) <= check_dt and (self.start_dt + (self.width_td * (index+1))) > check_dt
         
     def getEventData(self, index, select_str='*', where_list=None, **kwargs):
         """
@@ -419,8 +422,8 @@ class Timeline(object):
             
         for k, v in kwargs.items():
             if isinstance(v, tuple):
-                sql_list.append('''%s in ?''' % k)
-                arg_list.append(v)
+                sql_list.append('''%s in (%s)''' % (k, ','.join(['?' for x in v])))
+                arg_list.extend(v)
             else:
                 sql_list.append('''%s = ?''' % k)
                 arg_list.append(v)
@@ -436,12 +439,12 @@ class Region(object):
         self.parent_region = parent_region
         self.parent_relationship = parent_relationship
         
-        self.max_value = 0
+        self.max_value = 1.0
         for graph in self.graph_list:
-            for index in range(len(timeline)):
+            #for index in range(len(timeline)):
                 #if index % 100 == 0:
                 #    print datetime.datetime.now(), index
-                self.max_value = float(max(self.max_value, graph.getValue(timeline, index)))
+                self.max_value = float(max(self.max_value, graph.computeValues(self)))
                 
         self.width = width
         if isinstance(height, float):
@@ -454,7 +457,7 @@ class Region(object):
             #print "..."
             graph.render(draw, self)
         
-        draw.text((self.getTop() + 5, self.getLeft() + 3), self.label_str, font=ImageFont.load_default(), fill='#999')
+        draw.text((self.getLeft() + 5, self.getTop() + 3), self.label_str, font=ImageFont.load_default(), fill='#999')
 
 
     def getTop(self):
@@ -485,44 +488,130 @@ class Region(object):
 
 
 class Graph(object):
-    def __init__(self, render_str, color_str, value_func, decay=0.0):
-        self.render_str = render_str
-        self.color_str = color_str
+    def __init__(self, render_list, value_func, smoothing=0.5, smoothing_type='none'):
+        self.render_list = render_list
+        #self.color_str = color_str
         self.value_func = value_func
-        self.decay = decay
+        self.raw_list = []
+        self.value_list = []
+        self.smoothing = smoothing
+        self.smoothing_type = smoothing_type
         
     def getValue(self, timeline, index):
         return self.value_func(timeline, index)
         
+    def computeValues(self, region):
+        if not self.value_list:
+            for i in range(len(region.timeline)):
+                self.raw_list.append(float(self.value_func(region.timeline, i)))
+
+            old_value = 0.0
+            #window_int = int(math.ceil(self.smoothing / (region.timeline.width_td.seconds + region.timeline.width_td.microseconds / 1000000.0)))
+            window_int = int(math.ceil(math.log(0.01, self.smoothing or 0.01)))
+            #print self.smoothing, window_int
+            #avg_list = [0.0] * int(math.ceil(self.smoothing / (region.timeline.width_td.seconds + region.timeline.width_td.microseconds / 1000000.0)))
+            #pad_list = [0.0] * int(math.ceil(self.smoothing / (region.timeline.width_td.seconds + region.timeline.width_td.microseconds / 1000000.0)))
+            
+            for i, value in enumerate(self.raw_list):
+                
+                if self.smoothing_type == 'none':
+                    pass
+                #elif self.smoothing_type == 'exp':
+                #    value = (1-self.smoothing) * value + (self.smoothing) * old_value
+                #    old_value = value
+                    
+                elif self.smoothing_type == 'window':
+                    value = 0.0
+                    #window_list = []
+                    for x in range(window_int+1):
+                        if i-window_int+x+1 < 0 or i-window_int+x+1 >= len(self.raw_list):
+                            a=0
+                        else:
+                            a=self.raw_list[i-window_int+x+1]
+                            
+                        if i+window_int-x-1 < 0 or i+window_int-x-1 >= len(self.raw_list):
+                            b=0
+                        else:
+                            b=self.raw_list[i+window_int-x-1]
+                            
+                        sm=self.smoothing
+                        value = (1-sm) * (a+b) / 2 + sm * value
+                        
+                    #avg_list.pop()
+                    #avg_list.insert(0, value)
+                    #
+                    #value = sum(avg_list) / len(avg_list)
+                    
+                self.value_list.append(value)
+            
+        return max(self.value_list)
+        
     def render(self, draw, region):
+        self.computeValues(region)
+        
         old_value = 0.0
-        for i in range(len(region.timeline)):
-            #try:
-            #    value = float(self.getValue(region.timeline, i)) / region.max_value * region.height
-            #except:
-            #    print repr(self.getValue(region.timeline, i))
-            #    raise
-            
-            value = float(self.getValue(region.timeline, i))
-            #print 'a', value
+        for i, value in enumerate(self.value_list):
             value = value / region.max_value * region.height
-            #print 'b', value
-            value = (1-self.decay) * value + (self.decay) * old_value
-            #print 'c', value
+            
+            if value >= 1 or old_value >= 1:
+                for render_str, color_str in self.render_list:
+                    if render_str == 'uppoint':
+                        draw.point((i + region.getLeft(), region.getBottom() - value), fill=color_str)
+                    elif render_str == 'upline':
+                        if value > old_value:
+                            draw.line([(i + region.getLeft(), region.getBottom() - value), (i + region.getLeft(), region.getBottom() - old_value - 1)], fill=color_str)
+                        else:
+                            draw.line([(i + region.getLeft() - 1, region.getBottom() - value - 1), (i + region.getLeft() - 1, region.getBottom() - old_value)], fill=color_str)
+                            draw.point((i + region.getLeft(), region.getBottom() - value), fill=color_str)
+                            
+                    elif render_str == 'upbar':
+                        draw.line([(i + region.getLeft(), region.getBottom() - value), (i + region.getLeft(), region.getBottom())], fill=color_str)
+                    elif render_str == 'downpoint':
+                        draw.point((i + region.getLeft(), region.getTop() + value), fill=color_str)
+                    elif render_str == 'downline':
+                        if value > old_value:
+                            draw.line([(i + region.getLeft(), region.getTop() + value), (i + region.getLeft(), region.getTop() + old_value + 1)], fill=color_str)
+                        else:
+                            draw.line([(i + region.getLeft() - 1, region.getTop() + value + 1), (i + region.getLeft() - 1, region.getTop() + old_value)], fill=color_str)
+                            draw.point((i + region.getLeft(), region.getTop() + value), fill=color_str)
+                            
+                    elif render_str == 'downbar':
+                        draw.line([(i + region.getLeft(), region.getTop() + value), (i + region.getLeft(), region.getTop())], fill=color_str)
+                    elif render_str == 'vbar':
+                        if value > 0:
+                            draw.line([(i + region.getLeft(), region.getBottom()), (i + region.getLeft(), region.getTop())], fill=color_str)
+                    elif render_str == 'imagebar':
+                        if value > 0:
+                            draw.line([(i + region.getLeft(), 10000), (i + region.getLeft(), 0)], fill=color_str)
+
             old_value = value
-            
-            
-            if self.render_str == 'uppoint':
-                draw.point((i + region.getLeft(), region.getBottom() - value), fill=self.color_str)
-            elif self.render_str == 'upline':
-                draw.line([(i + region.getLeft(), region.getBottom() - value), (i + region.getLeft(), region.getBottom())], fill=self.color_str)
-            elif self.render_str == 'downpoint':
-                draw.point((i + region.getLeft(), region.getTop() + value), fill=self.color_str)
-            elif self.render_str == 'downline':
-                draw.line([(i + region.getLeft(), region.getTop() + value), (i + region.getLeft(), region.getTop())], fill=self.color_str)
-            elif self.render_str == 'vbar':
-                if value > 0:
-                    draw.line([(i + region.getLeft(), region.getBottom()), (i + region.getLeft(), region.getTop())], fill=self.color_str)
+    
+class TimeGraph(Graph):
+    def __init__(self):
+        pass
+
+    def computeValues(self, region):
+        return 0
+    
+    def render(self, draw, region):
+        start_dt = region.timeline.start_dt
+        
+        tick_td = datetime.timedelta(seconds=10)
+        
+        if region.timeline.width_td.seconds < 1:
+            next_dt = start_dt + tick_td
+            for i in range(len(region.timeline)):
+                if region.timeline.containsTime(next_dt, i):
+                    draw.line([(i + region.getLeft(), 10000), (i + region.getLeft(), 0)], fill='#222')
+                    next_dt += tick_td
+                    
+        tick_td = datetime.timedelta(seconds=60)
+        
+        next_dt = start_dt + tick_td
+        for i in range(len(region.timeline)):
+            if region.timeline.containsTime(next_dt, i):
+                draw.line([(i + region.getLeft(), 10000), (i + region.getLeft(), 0)], fill='#444')
+                next_dt += tick_td
 
     
 
@@ -532,6 +621,9 @@ def main(sys_argv, options, arguments):
     
     print datetime.datetime.now(), "Iterating over combat images..."
     for combat in conn.execute('''select * from combat order by start_event_id''').fetchall():
+        
+        #if combat['id'] < 5:
+        #    continue
 
         # This way gives us strings, not datetimes.
         #start_dt, end_dt = conn.execute('''select min(time) a, max(time) b from event where combat_id = ?''', (combat['id'],)).fetchone()
@@ -540,27 +632,42 @@ def main(sys_argv, options, arguments):
         end_dt = max(time_list)
         #print start_dt, repr(start_dt)
         
-        timeline = Timeline(conn, start_dt, end_dt, width=0.5)
+        timeline = Timeline(conn, start_dt, end_dt, width=0.2)
         
-        print datetime.datetime.now(), "len(timeline):", len(timeline)
+        #print datetime.datetime.now(), "len(timeline):", len(timeline)
+        
+        region_list = [Region(timeline, 'test_%s.png' % combat['id'], [TimeGraph()], len(timeline), 20)]
         
         graph_list = []
-        graph_list.append(Graph('upline', '#ff0', lambda timeline, index: timeline.getEventData(index, 'sum(amount)', suffix='_HEAL', destType='PC').fetchone()[0] or 0))
-        graph_list.append(Graph('upline', '#0f0', lambda timeline, index: timeline.getEventData(index, 'sum(amount) - sum(extra)', suffix='_HEAL', destType='PC').fetchone()[0] or 0))
-        #graph_list.append(Graph('upline', '#0f0', lambda timeline, index: timeline.getEventData(index, 'sum(amount) - sum(extra)', suffix='_DAMAGE', sourceType='PC').fetchone()[0] or 0))
+        #graph_list.append(Graph([('upbar', '#500'), ('upline', '#900')],
+        #        lambda timeline, index: timeline.getEventData(index, 'sum(amount) - sum(extra)', suffix='_DAMAGE', sourceType=('PC','Pet'), destType=('NPC','Mount')).fetchone()[0] or 0,
+        #        smoothing=0.0))
+        graph_list.append(Graph([('upbar', '#500'), ('upline', '#900')],
+                lambda timeline, index: timeline.getEventData(index, 'sum(amount) - sum(extra)', suffix='_DAMAGE', sourceType=('PC','Pet'), destType=('NPC','Mount')).fetchone()[0] or 0,
+                smoothing=0.8, smoothing_type='window'))
         
-        print datetime.datetime.now(), "Before region..."
+        #graph_list.append(Graph([('upbar', '#050'), ('upline', '#090')],
+        #        lambda timeline, index: timeline.getEventData(index, 'sum(amount) - sum(extra)', suffix='_HEAL', destType=('NPC','Mount')).fetchone()[0] or 0,
+        #        smoothing=0.0))
+        graph_list.append(Graph([('upline', '#0f0')],
+                lambda timeline, index: timeline.getEventData(index, 'sum(amount) - sum(extra)', suffix='_HEAL', destType=('NPC','Mount')).fetchone()[0] or 0,
+                smoothing=0.8, smoothing_type='window'))
+        region_list.append(Region(timeline, "PC DPS / Boss Healing", graph_list, len(timeline), 0.01, region_list[-1], 'under'))
         
-        region = Region(timeline, "Testing...", graph_list, len(timeline), 500)
+        graph_list = []
+        graph_list.append(Graph([('upline', '#ff0')], lambda timeline, index: timeline.getEventData(index, 'sum(amount)', suffix='_HEAL', destType='PC').fetchone()[0] or 0, smoothing=0.0))
+        graph_list.append(Graph([('upbar', '#0f0')], lambda timeline, index: timeline.getEventData(index, 'sum(amount) - sum(extra)', suffix='_HEAL', destType='PC').fetchone()[0] or 0, smoothing=0.0))
+        region_list.append(Region(timeline, "Player Healing", graph_list, len(timeline), 0.01, region_list[-1], 'under'))
         
         
     
-        image = Image.new('RGB', (int(len(timeline)), int(region.height)))
+        image = Image.new('RGB', (int(region_list[0].width), int(sum([x.height for x in region_list]))))
         draw = ImageDraw.Draw(image)
         
-        print datetime.datetime.now(), "Before render..."
+        print datetime.datetime.now(), "Rendering: %s" % 'test_%s.png' % combat['id']
 
-        region.render(draw)
+        for region in region_list:
+            region.render(draw)
         
         image.save('test_%s.png' % combat['id'])
         
