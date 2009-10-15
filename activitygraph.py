@@ -486,7 +486,29 @@ class Region(object):
         return self.getLeft() + self.width
         
 
-
+def smooth_NWindowAvg(raw_list, *args):
+    
+    x_list = list(raw_list)
+    v_list = []
+    l = len(raw_list)
+    for n in args:
+        n = int((n-1) / 2)
+        for i in range(len(x_list)):
+            if i <= n:
+                #print '...', len(x_list[0:i+n+1]), (n * 2.0 + 1.0)
+                v = sum(x_list[0:i+n+1]) / (n * 2.0 + 1.0)
+            else:
+                #print '...', len(x_list[i-n:i+n+1]), (n * 2.0 + 1.0)
+                v = sum(x_list[i-n:i+n+1]) / (n * 2.0 + 1.0)
+            v_list.append(v)
+            
+        x_list = v_list
+        v_list = []
+        
+    #print sum(x_list), sum(raw_list)
+        
+    return x_list
+            
 class Graph(object):
     def __init__(self, render_list, value_func, smoothing=0.5, smoothing_type='none'):
         self.render_list = render_list
@@ -512,15 +534,18 @@ class Graph(object):
             #avg_list = [0.0] * int(math.ceil(self.smoothing / (region.timeline.width_td.seconds + region.timeline.width_td.microseconds / 1000000.0)))
             #pad_list = [0.0] * int(math.ceil(self.smoothing / (region.timeline.width_td.seconds + region.timeline.width_td.microseconds / 1000000.0)))
             
-            for i, value in enumerate(self.raw_list):
+            if self.smoothing_type == 'none':
+                self.value_list = list(self.raw_list)
+            elif self.smoothing_type == 'window':
+                self.value_list = smooth_NWindowAvg(self.raw_list, 3, 3, 3, 5)
+            elif self.smoothing_type == 'xwindow':
+                self.value_list = []
+                for i, value in enumerate(self.raw_list):
                 
-                if self.smoothing_type == 'none':
-                    pass
                 #elif self.smoothing_type == 'exp':
                 #    value = (1-self.smoothing) * value + (self.smoothing) * old_value
                 #    old_value = value
                     
-                elif self.smoothing_type == 'window':
                     value = 0.0
                     #window_list = []
                     for x in range(window_int+1):
