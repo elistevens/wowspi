@@ -17,7 +17,7 @@ import urllib
 import urllib2
 
 import combatlogparser
-
+import armoryutils
 
 def usage(sys_argv):
     op = optparse.OptionParser()
@@ -26,20 +26,21 @@ def usage(sys_argv):
     return op.parse_args(sys_argv)
 
 def usage_setup(op, **kwargs):
-    if kwargs.get('prune', True):
-        op.add_option("--prune"
-                , help="Prune the resulting combat encounters to only include those where the named actors were present (ex: 'Sartharion,Tenebron,Shadron,Vesperon').  Defaults to all T7-T9 raid bosses."
-                , metavar="ACTOR"
-                , dest="prune_str"
-                , action="store"
-                , type="str"
-                , default="Sartharion,Malygos,Anub'Rekhan,Grand Widow Faerlina,Maexxna,Noth the Plaguebringer,Heigan the Unclean,Loatheb," +\
-                          "Instructor Razuvious,Gothik the Harvester,Patchwerk,Grobbulus,Gluth,Thaddius,Sapphiron,Kel'Thuzad," +\
-                          "Ignis the Furnace Master,Razorscale,XT-002 Deconstructor,Steelbreaker,Kologarn,Auriya,Aerial Command Unit,Leviathan Mk II,VX-001,Thorim,Hodir,Freya," +\
-                          "General Vezax,Guardian of Yogg Saron,Crusher Tentacle,Corrupter Tentacle,Constrictor Tentacle,Yogg Saron" +\
-                          "Gormok the Impaler,Acidmaw,Dreadscale,Icehowl,Lord Jaraxxus,Eydis Darkbane,Fjola Lightbane,Anub'arak,Nerubian Burrower,Onyxia" +\
-                          "Gorgrim Shadowcleave,Birana Stormhoof,Erin Misthoof,Ruj'kah,Ginselle Blightslinger,Liandra Suncaller,Malithas Brightblade,Caiphus the Stern,Vivienne Blackwhisper,Maz'dinah,Broln Stouthorn,Thrakgar,Harkzog,Narrhok Steelbreaker",
-            )
+    pass
+    #if kwargs.get('prune', True):
+    #    op.add_option("--prune"
+    #            , help="Prune the resulting combat encounters to only include those where the named actors were present (ex: 'Sartharion,Tenebron,Shadron,Vesperon').  Defaults to all T7-T9 raid bosses."
+    #            , metavar="ACTOR"
+    #            , dest="prune_str"
+    #            , action="store"
+    #            , type="str"
+    #            , default="Sartharion,Malygos,Anub'Rekhan,Grand Widow Faerlina,Maexxna,Noth the Plaguebringer,Heigan the Unclean,Loatheb," +\
+    #                      "Instructor Razuvious,Gothik the Harvester,Patchwerk,Grobbulus,Gluth,Thaddius,Sapphiron,Kel'Thuzad," +\
+    #                      "Ignis the Furnace Master,Razorscale,XT-002 Deconstructor,Steelbreaker,Kologarn,Auriya,Aerial Command Unit,Leviathan Mk II,VX-001,Thorim,Hodir,Freya," +\
+    #                      "General Vezax,Guardian of Yogg Saron,Crusher Tentacle,Corrupter Tentacle,Constrictor Tentacle,Yogg Saron" +\
+    #                      "Gormok the Impaler,Acidmaw,Dreadscale,Icehowl,Lord Jaraxxus,Eydis Darkbane,Fjola Lightbane,Anub'arak,Nerubian Burrower,Onyxia" +\
+    #                      "Gorgrim Shadowcleave,Birana Stormhoof,Erin Misthoof,Ruj'kah,Ginselle Blightslinger,Liandra Suncaller,Malithas Brightblade,Caiphus the Stern,Vivienne Blackwhisper,Maz'dinah,Broln Stouthorn,Thrakgar,Harkzog,Narrhok Steelbreaker",
+    #        )
 
 
 class LogSegment(object):
@@ -73,14 +74,15 @@ class LogSegment(object):
             elif event['suffix'] in ('_SUMMON', '_RESURRECT') and event['sourceType'] == 'PC':
                 self.closeEvent = event
 
-            try:
-                self.actor_set.add(event['sourceType'] + "/" + event['sourceName'])
-            except:
-                pass
-            try:
-                self.actor_set.add(event['destType'] + "/" + event['destName'])
-            except:
-                pass
+            if event['suffix'] == '_DAMAGE' or event['suffix'] == '_HEAL':
+                try:
+                    self.actor_set.add(event['sourceType'] + "/" + event['sourceName'])
+                except:
+                    pass
+                try:
+                    self.actor_set.add(event['destType'] + "/" + event['destName'])
+                except:
+                    pass
 
     def finalizeClose(self, conn, combat_id):
         if not self.closeEvent:
@@ -123,6 +125,8 @@ class LogCombat(object):
         self.closeDelay = closeDelay
         self.closeEvent = None
         self.openEvent = None
+        self.instance_str = None
+        self.encounter_str = None
 
     def addEvent(self, event):
         if self.segment_list[-1].isOpen():
@@ -146,20 +150,35 @@ class LogCombat(object):
         return datetime.timedelta(seconds=self.closeDelay) > self.segment_list[-1].event_list[-1]['time'] - self.closeEvent['time']
 
     def prune(self, require_set):
-        self.segment_list = [x for x in self.segment_list if x.prune(require_set)]
-
-        self.prune_set = set()
-        for x in self.segment_list:
-            self.prune_set.update(x.prune(require_set))
-
-        #print self.segment_list, self.prune_set
+        tmp_list = list(self.segment_list)
+        
+        self.segment_list = []
+        for segment in tmp_list:
+            actor_set = segment.prune(require_set)
+            
+            if actor_set:
+                self.segment_list.append(segment)
+                
+                for actor_str in actor_set:
+                    actor_str = actor_str.split('/', 1)[-1]
+                    if not self.instance_str:
+                        self.instance_str = armoryutils.instanceByMob(actor_str)
+                    if not self.encounter_str:
+                        self.encounter_str = armoryutils.encounterByMob(actor_str)
+        #self.segment_list = [x for x in self.segment_list if x.prune(require_set)]
+        #
+        ##self.prune_set = set()
+        #for x in self.segment_list:
+        #    self.prune_set.update(x.prune(require_set))
+        #
+        ##print self.segment_list, self.prune_set
         return self.segment_list
 
     def finalizeClose(self, conn, require_set):
         #if self.prune(require_set):
         
-            self.db_id = conn.execute('''insert into combat (start_event_id, close_event_id, end_event_id) values (?, ?, ?)''', \
-                    (self.segment_list[0].event_list[0]['id'], self.closeEvent['id'], self.segment_list[-1].event_list[-1]['id'])).lastrowid
+            self.db_id = conn.execute('''insert into combat (start_event_id, close_event_id, end_event_id, instance, encounter) values (?, ?, ?, ?, ?)''', \
+                    (self.segment_list[0].event_list[0]['id'], self.closeEvent['id'], self.segment_list[-1].event_list[-1]['id'], self.instance_str, self.encounter_str)).lastrowid
             
             for segment in self.segment_list:
                 segment.finalizeClose(conn, self.db_id)
@@ -189,6 +208,30 @@ class LogCombat(object):
                         del active_dict[event['sourceName']]
 
                 conn.execute('''update event set active_dict = ?, wound_dict = ? where id = ?''', (active_dict, wound_dict, event['id']))
+                
+            role_sql = '''select name, sum(d) damage, sum(h) healing, sum(v) overhealed from (
+                select sourceName name, sum(amount) - sum(extra) d, 0 h, 0 v from event where sourceType='PC' and suffix='_DAMAGE' and combat_id=? group by sourceName
+                union
+                select sourceName name, 0 d, sum(amount) - sum(extra) h, 0 v from event where sourceType='PC' and suffix='_HEAL' and combat_id=? group by sourceName
+                union
+                select destName name,   0 d, 0 h, sum(amount) v from event where destType='PC' and suffix='_HEAL' and combat_id=? group by destName
+                ) group by name order by damage;'''
+
+            dps_list = []
+            healer_list = []
+            tank_list = []
+            for row in conn.execute(role_sql, tuple([self.db_id, self.db_id, self.db_id])):
+                if row['damage'] > row['healing'] and row['damage'] > row['overhealed']:
+                    dps_list.append(row['name'])
+                elif row['healing'] > row['damage'] and row['healing'] > row['overhealed']:
+                    healer_list.append(row['name'])
+                elif row['overhealed'] > row['healing'] and row['overhealed'] > row['damage']:
+                    tank_list.append(row['name'])
+                        
+                        
+            conn.execute('''update combat set dps_list = ?, healer_list = ?, tank_list = ? where id = ?''', (dps_list, healer_list, tank_list, self.db_id))
+                        
+                        
                 #conn.commit()
 
 
@@ -204,7 +247,7 @@ def main(sys_argv, options, arguments):
     
     if not options.force:
         try:
-            if conn.execute('''select count(*) from combat''').fetchone()[0] > 0:
+            if conn.execute('''select * from combat limit 1''').fetchone():
                 print datetime.datetime.now(), "Skipping combat generation..."
                 return
         except:
@@ -216,7 +259,7 @@ def main(sys_argv, options, arguments):
     conn.execute('''update event set segment_id = ?, combat_id = ?, wound_dict = ?, active_dict = ?''', (0, 0, {}, {}))
     
     conn.execute('''drop table if exists combat''')
-    conn.execute('''create table combat (id integer primary key, start_event_id, close_event_id, end_event_id)''')
+    conn.execute('''create table combat (id integer primary key, start_event_id, close_event_id, end_event_id, instance, encounter, dps_list json, healer_list json, tank_list json)''')
 
     conn.execute('''drop table if exists segment''')
     conn.execute('''create table segment (id integer primary key, start_event_id, close_event_id, end_event_id, combat_id)''')
@@ -226,10 +269,6 @@ def main(sys_argv, options, arguments):
     print datetime.datetime.now(), "Building combats..."
     combat_list = []
     for event in conn.execute('''select * from event order by time''').fetchall():
-        #print event
-        
-        #if not combat_list:
-        #    combat_list.append(LogCombat(event))
         if combat_list and combat_list[-1].isOpen():
             combat_list[-1].addEvent(event)
         else:
@@ -237,7 +276,7 @@ def main(sys_argv, options, arguments):
     
     print datetime.datetime.now(), "Pruning combats..."
     require_set = set()
-    for name_str in options.prune_str.split(','):
+    for name_str in armoryutils.getAllMobs():
         require_set.add('NPC/' + name_str)
         require_set.add('Mount/' + name_str)
     combat_list = [combat for combat in combat_list if combat.prune(require_set)]

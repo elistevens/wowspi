@@ -65,7 +65,7 @@ def sqlite_scrapeCharacters(db_path, name_list, realm_str, region_str, maxAge_td
     
     try:
         row_list = conn.execute('''select name from toon where updatedAt > ?''', (datetime.datetime.now() - maxAge_td,))
-        print "row_list", row_list
+        #print "row_list", row_list
     except Exception, e:
         print "Dropping...", e
         row_list = []
@@ -76,7 +76,7 @@ def sqlite_scrapeCharacters(db_path, name_list, realm_str, region_str, maxAge_td
     for row in row_list:
         name_set.add(row['name'])
     
-    print "name_list, name_set:", name_list, name_set
+    #print "name_list, name_set:", name_list, name_set
     for name_str in name_list or []:
         if name_str not in name_set:
             armory_dict = dict_scrapeCharacter(name_str, realm_str, region_str)
@@ -131,7 +131,7 @@ def dict_scrapeCharacter(name_str, realm_str, region_str):
         #raise
         return {}
 
-def instanceBosses():
+def encounterData():
     return {
         "Naxxramas": {
             "Anub'Rekhan": {
@@ -256,9 +256,10 @@ def instanceBosses():
             "General Vezax": {
                 "boss": ["General Vezax"],
                 "mobs": ["Saronite Animus"],
+                "stasis": "vezax",
             },
-            "Yogg Saron": {
-                "boss": ["Guardian of Yogg Saron", "Crusher Tentacle", "Brain of Yogg Saron", "Yogg Saron"],
+            "Yogg-Saron": {
+                "boss": ["Guardian of Yogg-Saron", "Crusher Tentacle", "Brain of Yogg-Saron", "Yogg-Saron"],
                 "mobs": ["Corruptor Tentacle", "Constrictor Tentacle", "Immortal Guardian"],
             },
             "Algalon": {
@@ -301,25 +302,68 @@ def instanceBosses():
             },
         },
     }
-                
+    
+def getBossMobs():
+    boss_list = []
+    
+    for instance, instance_dict in encounterData().items():
+        for encounter, encounter_dict in instance_dict.items():
+            boss_list.extend(encounter_dict['boss'])
+            
+    return boss_list
 
+def getMobs():
+    mobs_list = []
+    
+    for instance, instance_dict in encounterData().items():
+        for encounter, encounter_dict in instance_dict.items():
+            mobs_list.extend(encounter_dict['mobs'])
+            
+    return mobs_list
 
+def getAllMobs():
+    mobs_list = []
+    
+    for instance, instance_dict in encounterData().items():
+        for encounter, encounter_dict in instance_dict.items():
+            mobs_list.extend(encounter_dict['boss'])
+            mobs_list.extend(encounter_dict['mobs'])
+            
+    return mobs_list
 
+def encounterByMob(npc_str):
+    for instance, instance_dict in encounterData().items():
+        for encounter, encounter_dict in instance_dict.items():
+            if npc_str in encounter_dict['boss']:
+                return encounter
+            if npc_str in encounter_dict['mobs']:
+                return encounter
+    
+def instanceByMob(npc_str):
+    for instance, instance_dict in encounterData().items():
+        for encounter, encounter_dict in instance_dict.items():
+            if npc_str in encounter_dict['boss']:
+                return instance
+            if npc_str in encounter_dict['mobs']:
+                return instance
 
-
+def getStasisName(instance, encounter):
+    data_dict = encounterData()[instance][encounter]
+    
+    return data_dict.get('stasis', re.sub('[^a-z]', '', encounter.lower()))
 
 def classColors():
     color_dict = {
-            'Death Knight': ((196, 30, 59), (0.77, 0.12, 0.23), '#C41F3B'),
-            'Druid': ((255, 125, 10), (1.00, 0.49, 0.04), '#FF7D0A'),
-            'Hunter': ((171, 212, 115), (0.67, 0.83, 0.45), '#ABD473'),
-            'Mage': ((105, 204, 240), (0.41, 0.80, 0.94), '#69CCF0'),
-            'Paladin': ((245, 140, 186), (0.96, 0.55, 0.73), '#F58CBA'),
-            'Priest': ((255, 255, 255), (1.00, 1.00, 1.00), '#FFFFFF'),
-            'Rogue': ((255, 245, 105), (1.00, 0.96, 0.41), '#FFF569'),
-            'Shaman': ((36, 89, 255), (0.14, 0.35, 1.00), '#2459FF'),
-            'Warlock': ((148, 130, 201), (0.58, 0.51, 0.79), '#9482C9'),
-            'Warrior': ((199, 156, 110), (0.78, 0.61, 0.43), '#C79C6E'),
+            'Death Knight': ((196,  30,  59), (0.77, 0.12, 0.23), '#C41F3B'),
+            'Druid':        ((250, 125,  10), (0.98, 0.49, 0.04), '#FA7D0A'),
+            'Hunter':       ((171, 212, 115), (0.67, 0.83, 0.45), '#ABD473'),
+            'Mage':         ((105, 204, 240), (0.41, 0.80, 0.94), '#69CCF0'),
+            'Paladin':      ((245, 140, 186), (0.96, 0.55, 0.73), '#F58CBA'),
+            'Priest':       ((250, 250, 250), (0.98, 0.98, 0.98), '#FAFAFA'),
+            'Rogue':        ((250, 245, 105), (0.98, 0.96, 0.41), '#FAF569'),
+            'Shaman':       (( 36,  89, 250), (0.14, 0.35, 0.98), '#2459FA'),
+            'Warlock':      ((148, 130, 201), (0.58, 0.51, 0.79), '#9482C9'),
+            'Warrior':      ((199, 156, 110), (0.78, 0.61, 0.43), '#C79C6E'),
         }
 
     return color_dict

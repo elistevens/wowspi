@@ -9,6 +9,7 @@ import itertools
 import json
 import math
 import optparse
+import os
 import random
 import re
 import sqlite3
@@ -22,6 +23,7 @@ from PIL import Image, ImageDraw, ImageFont
 import combatlogparser
 import combatlogorg
 import armoryutils
+import stasisutils
 
 #version = None
 #htmlContent1 = """..."""
@@ -33,6 +35,7 @@ def usage(sys_argv):
     combatlogorg.usage_setup(op)
     combatlogparser.usage_setup(op)
     armoryutils.usage_setup(op)
+    stasisutils.usage_setup(op)
     return op.parse_args(sys_argv)
 
 def usage_setup(op, **kwargs):
@@ -453,7 +456,9 @@ class Region(object):
             self.height = int(height)
             
     def render(self, draw):
-        for graph in self.graph_list:
+        tmp_list = list(self.graph_list)
+        tmp_list.reverse()
+        for graph in tmp_list:
             #print "..."
             graph.render(draw, self)
         
@@ -487,7 +492,6 @@ class Region(object):
         
 
 def smooth_NWindowAvg(raw_list, *args):
-    
     x_list = list(raw_list)
     v_list = []
     l = len(raw_list)
@@ -510,65 +514,31 @@ def smooth_NWindowAvg(raw_list, *args):
     return x_list
             
 class Graph(object):
-    def __init__(self, render_list, value_func, smoothing=0.5, smoothing_type='none'):
+    def __init__(self, render_list, value_func, smoothing=None, stack_graph=None):
         self.render_list = render_list
-        #self.color_str = color_str
         self.value_func = value_func
         self.raw_list = []
         self.value_list = []
         self.smoothing = smoothing
-        self.smoothing_type = smoothing_type
+        self.stack_graph = stack_graph
         
-    def getValue(self, timeline, index):
-        return self.value_func(timeline, index)
+    #def getValue(self, region, index):
+    #    self.computeValues(region)
+    #    return self.value_list[index]
         
     def computeValues(self, region):
         if not self.value_list:
             for i in range(len(region.timeline)):
                 self.raw_list.append(float(self.value_func(region.timeline, i)))
 
-            old_value = 0.0
-            #window_int = int(math.ceil(self.smoothing / (region.timeline.width_td.seconds + region.timeline.width_td.microseconds / 1000000.0)))
-            window_int = int(math.ceil(math.log(0.01, self.smoothing or 0.01)))
-            #print self.smoothing, window_int
-            #avg_list = [0.0] * int(math.ceil(self.smoothing / (region.timeline.width_td.seconds + region.timeline.width_td.microseconds / 1000000.0)))
-            #pad_list = [0.0] * int(math.ceil(self.smoothing / (region.timeline.width_td.seconds + region.timeline.width_td.microseconds / 1000000.0)))
-            
-            if self.smoothing_type == 'none':
+            if self.smoothing:
+                self.value_list = smooth_NWindowAvg(self.raw_list, *self.smoothing)
+            else:
                 self.value_list = list(self.raw_list)
-            elif self.smoothing_type == 'window':
-                self.value_list = smooth_NWindowAvg(self.raw_list, 3, 3, 3, 5)
-            elif self.smoothing_type == 'xwindow':
-                self.value_list = []
-                for i, value in enumerate(self.raw_list):
-                
-                #elif self.smoothing_type == 'exp':
-                #    value = (1-self.smoothing) * value + (self.smoothing) * old_value
-                #    old_value = value
-                    
-                    value = 0.0
-                    #window_list = []
-                    for x in range(window_int+1):
-                        if i-window_int+x+1 < 0 or i-window_int+x+1 >= len(self.raw_list):
-                            a=0
-                        else:
-                            a=self.raw_list[i-window_int+x+1]
-                            
-                        if i+window_int-x-1 < 0 or i+window_int-x-1 >= len(self.raw_list):
-                            b=0
-                        else:
-                            b=self.raw_list[i+window_int-x-1]
-                            
-                        sm=self.smoothing
-                        value = (1-sm) * (a+b) / 2 + sm * value
-                        
-                    #avg_list.pop()
-                    #avg_list.insert(0, value)
-                    #
-                    #value = sum(avg_list) / len(avg_list)
-                    
-                self.value_list.append(value)
             
+        if self.stack_graph:
+            self.stack_graph.computeValues(region)
+            return max([a + b for (a, b) in itertools.izip(self.value_list, self.stack_graph.value_list)])
         return max(self.value_list)
         
     def render(self, draw, region):
@@ -608,7 +578,7 @@ class Graph(object):
                     elif render_str == 'imagebar':
                         if value > 0:
                             draw.line([(i + region.getLeft(), 10000), (i + region.getLeft(), 0)], fill=color_str)
-
+            
             old_value = value
     
 class TimeGraph(Graph):
@@ -641,7 +611,7 @@ class TimeGraph(Graph):
     
 
 def main(sys_argv, options, arguments):
-    combatlogorg.main(sys_argv, options, arguments)
+    stasisutils.main(sys_argv, options, arguments)
     conn = combatlogparser.sqlite_connection(options)
     
     print datetime.datetime.now(), "Iterating over combat images..."
@@ -650,130 +620,87 @@ def main(sys_argv, options, arguments):
         #if combat['id'] < 5:
         #    continue
 
-        # This way gives us strings, not datetimes.
-        #start_dt, end_dt = conn.execute('''select min(time) a, max(time) b from event where combat_id = ?''', (combat['id'],)).fetchone()
         time_list = [x['time'] for x in conn.execute('''select time from event where combat_id = ?''', (combat['id'],)).fetchall()]
         start_dt = min(time_list)
         end_dt = max(time_list)
-        #print start_dt, repr(start_dt)
         
-        timeline = Timeline(conn, start_dt, end_dt, width=0.2)
-        
-        #print datetime.datetime.now(), "len(timeline):", len(timeline)
-        
-        region_list = [Region(timeline, 'test_%s.png' % combat['id'], [TimeGraph()], len(timeline), 20)]
+        timeline = Timeline(conn, start_dt, end_dt, width=0.5)
+        region_list = [Region(timeline, '%s: %s, %s' % (combat['instance'], combat['encounter'], timeline.start_dt), [TimeGraph()], len(timeline), 20)]
         
         graph_list = []
-        #graph_list.append(Graph([('upbar', '#500'), ('upline', '#900')],
-        #        lambda timeline, index: timeline.getEventData(index, 'sum(amount) - sum(extra)', suffix='_DAMAGE', sourceType=('PC','Pet'), destType=('NPC','Mount')).fetchone()[0] or 0,
-        #        smoothing=0.0))
-        graph_list.append(Graph([('upbar', '#500'), ('upline', '#900')],
-                lambda timeline, index: timeline.getEventData(index, 'sum(amount) - sum(extra)', suffix='_DAMAGE', sourceType=('PC','Pet'), destType=('NPC','Mount')).fetchone()[0] or 0,
-                smoothing=0.8, smoothing_type='window'))
-        
-        #graph_list.append(Graph([('upbar', '#050'), ('upline', '#090')],
-        #        lambda timeline, index: timeline.getEventData(index, 'sum(amount) - sum(extra)', suffix='_HEAL', destType=('NPC','Mount')).fetchone()[0] or 0,
-        #        smoothing=0.0))
         graph_list.append(Graph([('upline', '#0f0')],
                 lambda timeline, index: timeline.getEventData(index, 'sum(amount) - sum(extra)', suffix='_HEAL', destType=('NPC','Mount')).fetchone()[0] or 0,
-                smoothing=0.8, smoothing_type='window'))
+                smoothing=[3,3,3,5]))
+        #graph_list.append(Graph([('upbar', '#050'), ('upline', '#090')],
+        #        lambda timeline, index: timeline.getEventData(index, 'sum(amount) - sum(extra)', suffix='_HEAL', destType=('NPC','Mount')).fetchone()[0] or 0,
+        #        smoothing=[3,3,3,5]))
+
+        graph_list.append(Graph([('upbar', '#500'), ('upline', '#900')],
+                lambda timeline, index: timeline.getEventData(index, 'sum(amount) - sum(extra)', suffix='_DAMAGE', sourceType=('PC','Pet'), destType=('NPC','Mount'), \
+                                                              destName=tuple(armoryutils.encounterData()[combat['instance']][combat['encounter']]['boss'])).fetchone()[0] or 0,
+                smoothing=[3,3,3,5]))
+        graph_list.append(Graph([('upbar', '#530'), ('upline', '#970')],
+                lambda timeline, index: timeline.getEventData(index, 'sum(amount) - sum(extra)', suffix='_DAMAGE', sourceType=('PC','Pet'), destType=('NPC','Mount')).fetchone()[0] or 0,
+                smoothing=[3,3,3,5]))
+        #graph_list.append(Graph([('upbar', '#500'), ('upline', '#900')],
+        #        lambda timeline, index: timeline.getEventData(index, 'sum(amount) - sum(extra)', suffix='_DAMAGE', sourceType=('PC','Pet'), destType=('NPC','Mount')).fetchone()[0] or 0,
+        #        smoothing=[3,3,3,5]))
         region_list.append(Region(timeline, "PC DPS / Boss Healing", graph_list, len(timeline), 0.01, region_list[-1], 'under'))
         
-        graph_list = []
-        graph_list.append(Graph([('upline', '#ff0')], lambda timeline, index: timeline.getEventData(index, 'sum(amount)', suffix='_HEAL', destType='PC').fetchone()[0] or 0, smoothing=0.0))
-        graph_list.append(Graph([('upbar', '#0f0')], lambda timeline, index: timeline.getEventData(index, 'sum(amount) - sum(extra)', suffix='_HEAL', destType='PC').fetchone()[0] or 0, smoothing=0.0))
-        region_list.append(Region(timeline, "Player Healing", graph_list, len(timeline), 0.01, region_list[-1], 'under'))
+        #graph_list = []
+        #graph_list.append(Graph([('upbar', '#0f0')],
+        #        lambda timeline, index: timeline.getEventData(index, 'sum(amount) - sum(extra)', suffix='_HEAL', destType='PC').fetchone()[0] or 0,
+        #        smoothing=None))
+        #graph_list.append(Graph([('upline', '#ff0')],
+        #        lambda timeline, index: timeline.getEventData(index, 'sum(amount)', suffix='_HEAL', destType='PC').fetchone()[0] or 0,
+        #        smoothing=None))
+        #region_list.append(Region(timeline, "Player Healing", graph_list, len(timeline), 0.01, region_list[-1], 'under'))
         
+        toon_dict = armoryutils.sqlite_scrapeCharacters(options.armorydb_path, combat['dps_list'] + combat['healer_list'] + combat['tank_list'], options.realm_str, options.region_str)
+        color_dict = armoryutils.classColors()
         
-    
+        for healer_str in combat['healer_list']:
+            graph_list = []
+            graph_list.append(Graph([('vbar', color_dict[toon_dict[healer_str]['class']][2])],
+                    lambda timeline, index: timeline.getEventData(index, 'count(*)', suffix=('_CAST_START', '_CAST_SUCCESS'), sourceName=healer_str).fetchone()[0] != 0,
+                    smoothing=None))
+            region_list.append(Region(timeline, healer_str, graph_list, len(timeline), 20, region_list[-1], 'under'))
+
+            graph_list = []
+            graph_list.append(Graph([('upbar', '#0f0')],
+                    lambda timeline, index: timeline.getEventData(index, 'sum(amount) - sum(extra)', suffix='_HEAL', destType='PC', sourceType='PC', sourceName=healer_str).fetchone()[0] or 0,
+                    smoothing=None))
+            #graph_list.append(Graph([('upline', '#090')],
+            #        lambda timeline, index: timeline.getEventData(index, 'sum(amount) - sum(extra)', suffix='_HEAL', destType='PC', sourceType='PC', sourceName=healer_str).fetchone()[0] or 0,
+            #        smoothing=[3,5,7,9,11]))
+            region_list.append(Region(timeline, "Healing", graph_list, len(timeline), 0.005, region_list[-1], 'under'))
+
+            graph_list = []
+            graph_list.append(Graph([('downbar', '#ff0')],
+                    lambda timeline, index: timeline.getEventData(index, 'sum(extra)', suffix='_HEAL', destType='PC', sourceType='PC', sourceName=healer_str).fetchone()[0] or 0,
+                    smoothing=None))
+            #graph_list.append(Graph([('downbar', '#a80')],
+            #        lambda timeline, index: timeline.getEventData(index, 'sum(extra)', suffix='_HEAL', destType='PC', sourceType='PC', sourceName=healer_str).fetchone()[0] or 0,
+            #        smoothing=[3,5,7,9,11]))
+            region_list.append(Region(timeline, "Overhealing", graph_list, len(timeline), 0.005, region_list[-1], 'under'))
+            
+
+
+        file_path = re.sub('[^a-zA-Z0-9_-]', '_', ("%s_%s_%s" % (combat['instance'], combat['encounter'], timeline.start_dt)).rsplit('.', 1)[0].replace(':', '-')) + '.png'
+        if combat['stasis_path']:
+            file_path = os.path.join(combat['stasis_path'], file_path)
+        
         image = Image.new('RGB', (int(region_list[0].width), int(sum([x.height for x in region_list]))))
         draw = ImageDraw.Draw(image)
         
-        print datetime.datetime.now(), "Rendering: %s" % 'test_%s.png' % combat['id']
+        print datetime.datetime.now(), "Rendering: %s" % file_path
 
         for region in region_list:
             region.render(draw)
         
-        image.save('test_%s.png' % combat['id'])
+        image.save(file_path)
         
         #break
-    
-    
-
-    ##print set(options.prune_str.split(','))
-    #
-    #global color_dict
-    #raw_dict = {
-    #        'Death Knight': (0.77 , 0.12 , 0.23 ),
-    #        'Druid': (1.00 , 0.49 , 0.04 ),
-    #        'Hunter': (0.67 , 0.83 , 0.45 ),
-    #        'Mage': (0.41 , 0.80 , 0.94 ),
-    #        'Paladin': (0.96 , 0.55 , 0.73 ),
-    #        'Priest': (1.00 , 1.00 , 1.00 ),
-    #        'Rogue': (1.00 , 0.96 , 0.41 ),
-    #        'Shaman': (0.14 , 0.35 , 1.00 ),
-    #        'Warlock': (0.58 , 0.51 , 0.79 ),
-    #        'Warrior': (0.78 , 0.61 , 0.43 ),
-    #        'NPC': (0.50 , 0.40 , 0.10 ),
-    #    }
-    #
-    #raw_dict['Priest'] = tuple([x * 0.7 for x in raw_dict['Priest']])
-    #raw_dict['Rogue'] = tuple([x * 0.9 for x in raw_dict['Rogue']])
-    #
-    ##logFile = combatlogorg.LogFile(arguments)
-    ###print repr(logFile)
-    ##logFile.prune(set(options.prune_str.split(',')))
-    #
-    ##date_str = arguments[0].split('-', 1)[1].split('.')[0]
-    ##file_path = "%s_" + date_str + "_%02d_%s_%s.png"
-    #
-    ##for i, combat in enumerate(logFile.combat_list):
-    #for i in [x['combat_id'] for x in conn.execute('''select distinct combat_id from event''').fetchall() if x['combat_id']]:
-    #    print repr(i)
-    #    #event_list = list(combat.eventIter())
-    #    event_list = conn.execute('''select * from event where combat_id = ? order by time''', (i,)).fetchall()
-    #    actor_list = [x['sourceName'].split('/', 1)[-1] for x in event_list if x['sourceName'] and x['sourceName'].startswith('PC/')]
-    #
-    #    file_path = "%s_" + event_list[0]['time'].strftime('%Y-%m-%d_%H-%M-%S') + "_%02d_%s_%s.png"
-    #
-    #    #actor_list = [x.split('/', 1)[-1] for x in combat.getActorSet() if x.startswith('PC/')]
-    #    actor_dict = {}
-    #    for actor in actor_list:
-    #        cast_list = [x for x in event_list if x['sourceName'] == actor and x['prefix'] == 'SPELL' and x['suffix'] in ('_CAST_START', '_CAST_SUCCESS')]
-    #
-    #        if cast_list:
-    #            delta_list = []
-    #            last = cast_list.pop(0)
-    #            for event in cast_list:
-    #                delta_list.append(event['time'] - last['time'])
-    #                last = event
-    #
-    #            delta_dict = collections.defaultdict(int)
-    #            for delta in delta_list:
-    #                bucket_int = int(float(delta.seconds + delta.microseconds / 1000000.0) * 10)
-    #                if bucket_int < 100:
-    #                    delta_dict[bucket_int] += 1
-    #
-    #            actor_dict[actor] = delta_dict
-    #        #for x in sorted(delta_dict.items()):
-    #        #    print actor, x
-    #    if actor_dict:
-    #        #castImage(file_path % ('CastInfo', i, re.sub('[^a-zA-Z]+', '', sorted(combat.prune_set)[0]), 'all'), list(combat.eventIter())[0]['time'], actor_dict)#, sorted(["Tantryst", "Mutagen", "Vampirion", "Ardwen", "Sameil", "Fatima", "Dusken", "Radamanthass", "Bluemorwe"]))
-    #        castImage(options, file_path % ('CastInfo', i, re.sub('[^a-zA-Z]+', '', 'FIXME'), 'all'), event_list[0]['time'], actor_dict)#, sorted(["Tantryst", "Mutagen", "Vampirion", "Ardwen", "Sameil", "Fatima", "Dusken", "Radamanthass", "Bluemorwe"]))
-    #
-    #    timeslice_list = []
-    #    event_list.reverse()
-    #    while event_list:
-    #        timeslice_list.append(Timeslice(event_list))
-    #
-    #    timelineImage(options, file_path % ('Timeline', i, re.sub('[^a-zA-Z]+', '', 'FIXME'), 'healer'), timeslice_list, sorted(["Tantryst", "Aurastraza", "Detty", "Burlyn", "Daliah", "Mutagen", "Vampirion", "Ardwen", "Sameil", "Fatima", "Dusken", "Radamanthass", "Radanepenthe", "Bluemorwe"]))
-    #    #for class_str in classColors():
-    #    #    armory_dict = scrapeArmory()
-    #    #    player_list = [k for (k, v) in armory_dict.items() if v['class'] == class_str]
-    #    #    combatImage(file_path % (i, re.sub('[^a-zA-Z]+', '', sorted(combat.prune_set)[0]), class_str.replace(' ', '')), timeslice_list, sorted(player_list))
-    #
-    #    #break
-    #
 
 
 
