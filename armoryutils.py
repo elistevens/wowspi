@@ -131,6 +131,181 @@ def dict_scrapeCharacter(name_str, realm_str, region_str):
         #raise
         return {}
 
+def instanceBosses():
+    return {
+        "Naxxramas": {
+            "Anub'Rekhan": {
+                "boss": ["Anub'Rekhan"],
+                "mobs": [],
+            },
+            "Grand Widow Faerlina": {
+                "boss": ["Grand Widow Faerlina"],
+                "mobs": [],
+            },
+            "Maexxna": {
+                "boss": ["Maexxna"],
+                "mobs": [],
+            },
+            "Noth the Plaguebringer": {
+                "boss": ["Noth the Plaguebringer"],
+                "mobs": ["Plagued Champion", "Plagued Guardian"],
+            },
+            "Heigan the Unclean": {
+                "boss": ["Heigan the Unclean"],
+                "mobs": [],
+            },
+            "Loatheb": {
+                "boss": ["Loatheb"],
+                "mobs": [],
+            },
+            "Instructor Razuvious": {
+                "boss": ["Instructor Razuvious"],
+                "mobs": [],
+            },
+            "Gothik the Harvester": {
+                "boss": ["Gothik the Harvester"],
+                "mobs": ["Unrelenting Trainee","Unrelenting Deathknight","Unrelenting Rider"
+                            "Spectral Trainee","Spectral Deathknight","Spectral Rider","Spectral Horse"],
+            },
+            "Four Horsemen": {
+                "boss": ["Thane Korth'azz","Lady Blaumeux","Baron Rivendare","Sir Zeliek"],
+                "mobs": [],
+            },
+            "Patchwerk": {
+                "boss": ["Patchwerk"],
+                "mobs": [],
+            },
+            "Grobbulus": {
+                "boss": ["Grobbulus"],
+                "mobs": [],
+            },
+            "Gluth": {
+                "boss": ["Gluth"],
+                "mobs": ["Zombie Chow"],
+            },
+            "Thaddius": {
+                "boss": ["Thaddius"],
+                "mobs": ["Feugen","Stalagg"],
+            },
+            "Sapphiron": {
+                "boss": ["Sapphiron"],
+                "mobs": [],
+            },
+            "Kel'Thuzad": {
+                "boss": ["Kel'Thuzad"],
+                "mobs": ["Soldier of the Frozen Wastes","Unstoppable Abomination","Soul Weaver","Guardian of Icecrown"],
+            },
+        },
+        "The Obsidian Sanctum": {
+            "Sartharion": {
+                "boss": ["Sartharion"],
+                "mobs": ["Shadron", "Vesperon", "Tenebron"],
+            },
+        },
+        "The Eye of Eternity": {
+            "Malygos": {
+                "boss": ["Malygos"],
+                "mobs": ["Nexus Lord", "Scion of Eternity"],
+            },
+        },
+        "Ulduar": {
+            #"Flame Leviathan": {
+            #    "boss": ["Flame Leviathan"],
+            #    "mobs": [],
+            #},
+            "Ignis the Furnace Master": {
+                "boss": ["Ignis the Furnace Master"],
+                "mobs": [],
+            },
+            "Razorscale": {
+                "boss": ["Razorscale"],
+                "mobs": ["Dark Rune Sentinel", "Dark Rune Watcher", "Dark Rune Guardian"],
+            },
+            "XT-002 Deconstructor": {
+                "boss": ["XT-002 Deconstructor"],
+                "mobs": ["Heart of the Deconstructor"],
+            },
+            "Assembly of Iron": {
+                "boss": ["Steelbreaker", "Runemaster Molgeim", "Stormcaller Brundir"],
+                "mobs": [],
+            },
+            "Kologarn": {
+                "boss": ["Kologarn"],
+                "mobs": [],
+            },
+            "Auriya": {
+                "boss": ["Auriya"],
+                "mobs": [],
+            },
+            "Mimiron": {
+                "boss": ["Leviathan Mk II", "VX-001", "Aerial Command Unit"],
+                "mobs": ["Assault Bot", "Junk Bot"],
+            },
+            "Freya": {
+                "boss": ["Freya"],
+                "mobs": [],
+            },
+            "Thorim": {
+                "boss": ["Thorim", "Runic Colossus", "Ancient Rune Giant"],
+                "mobs": ["Dark Rune Champion", "Dark Rune Evoker", "Dark Rune Warbringer", "Dark Rune Commoner", "Dark Rune Acolyte", "Iron Ring Guard", "Iron Honor Guard"],
+            },
+            "Hodir": {
+                "boss": ["Hodir"],
+                "mobs": [],
+            },
+            "General Vezax": {
+                "boss": ["General Vezax"],
+                "mobs": ["Saronite Animus"],
+            },
+            "Yogg Saron": {
+                "boss": ["Guardian of Yogg Saron", "Crusher Tentacle", "Brain of Yogg Saron", "Yogg Saron"],
+                "mobs": ["Corruptor Tentacle", "Constrictor Tentacle", "Immortal Guardian"],
+            },
+            "Algalon": {
+                "boss": ["Algalon the Observer"],
+                "mobs": [],
+            },
+        },
+        "Trial of the Crusader": {
+            "Northrend Beasts": {
+                "boss": ["Gormok the Impaler","Acidmaw","Dreadscale","Icehowl"],
+                "mobs": [],
+            },
+            "Lord Jaraxxus": {
+                "boss": ["Lord Jaraxxus"],
+                "mobs": [],
+            },
+            "Twin Val'kyr": {
+                "boss": ["Eydis Darkbane","Fjola Lightbane"],
+                "mobs": [],
+            },
+            "Faction Champions": {
+                "boss": ["Gorgrim Shadowcleave","Birana Stormhoof","Erin Misthoof","Ruj'kah","Ginselle Blightslinger","Liandra Suncaller",
+                            "Malithas Brightblade","Caiphus the Stern","Vivienne Blackwhisper","Maz'dinah","Broln Stouthorn","Thrakgar",
+                            "Harkzog","Narrhok Steelbreaker",
+                            "Tyrius Duskblade","Kavina Grovesong","Melador Valestrider","Alyssia Moonstalker","Nozle Whizzlestick",
+                            "Velanaa","Baelnor Lightbearer","Anthar Forgemender","Brienna Nightfell","Irieth Shadowstep","Shaabad",
+                            "Saamul","Serissa Grimdabbler","Shocuul",
+                        ],
+                "mobs": [],
+            },
+            "Anub'arak": {
+                "boss": ["Anub'arak"],
+                "mobs": ["Nerubian Burrower", "Swarm Scarab"],
+            },
+        },
+        "Onyxia's Lair": {
+            "Onyxia": {
+                "boss": ["Onyxia"],
+                "mobs": ["Onyxian Lair Guard", "Onyxian Whelp"],
+            },
+        },
+    }
+                
+
+
+
+
 
 
 def classColors():
