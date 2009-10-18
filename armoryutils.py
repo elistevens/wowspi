@@ -17,6 +17,7 @@ import urllib
 import urllib2
 import xml.etree.ElementTree
 
+from config import instanceData
 
 
 def usage(sys_argv):
@@ -131,7 +132,7 @@ def dict_scrapeCharacter(name_str, realm_str, region_str):
         #raise
         return {}
 
-def encounterData():
+def instanceData():
     return {
         "Naxxramas": {
             "Anub'Rekhan": {
@@ -306,7 +307,7 @@ def encounterData():
 def getBossMobs():
     boss_list = []
     
-    for instance, instance_dict in encounterData().items():
+    for instance, instance_dict in instanceData().items():
         for encounter, encounter_dict in instance_dict.items():
             boss_list.extend(encounter_dict['boss'])
             
@@ -315,7 +316,7 @@ def getBossMobs():
 def getMobs():
     mobs_list = []
     
-    for instance, instance_dict in encounterData().items():
+    for instance, instance_dict in instanceData().items():
         for encounter, encounter_dict in instance_dict.items():
             mobs_list.extend(encounter_dict['mobs'])
             
@@ -324,7 +325,7 @@ def getMobs():
 def getAllMobs():
     mobs_list = []
     
-    for instance, instance_dict in encounterData().items():
+    for instance, instance_dict in instanceData().items():
         for encounter, encounter_dict in instance_dict.items():
             mobs_list.extend(encounter_dict['boss'])
             mobs_list.extend(encounter_dict['mobs'])
@@ -332,7 +333,7 @@ def getAllMobs():
     return mobs_list
 
 def encounterByMob(npc_str):
-    for instance, instance_dict in encounterData().items():
+    for instance, instance_dict in instanceData().items():
         for encounter, encounter_dict in instance_dict.items():
             if npc_str in encounter_dict['boss']:
                 return encounter
@@ -340,7 +341,7 @@ def encounterByMob(npc_str):
                 return encounter
     
 def instanceByMob(npc_str):
-    for instance, instance_dict in encounterData().items():
+    for instance, instance_dict in instanceData().items():
         for encounter, encounter_dict in instance_dict.items():
             if npc_str in encounter_dict['boss']:
                 return instance
@@ -348,7 +349,7 @@ def instanceByMob(npc_str):
                 return instance
 
 def getStasisName(instance, encounter):
-    data_dict = encounterData()[instance][encounter]
+    data_dict = instanceData()[instance][encounter]
     
     return data_dict.get('stasis', re.sub('[^a-z]', '', encounter.lower()))
 

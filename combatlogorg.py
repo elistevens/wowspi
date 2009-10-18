@@ -215,18 +215,18 @@ class LogCombat(object):
                 select sourceName name, 0 d, sum(amount) - sum(extra) h, 0 v from event where sourceType='PC' and suffix='_HEAL' and combat_id=? group by sourceName
                 union
                 select destName name,   0 d, 0 h, sum(amount) v from event where destType='PC' and suffix='_HEAL' and combat_id=? group by destName
-                ) group by name order by damage;'''
+                ) group by name order by damage desc;'''
 
             dps_list = []
             healer_list = []
             tank_list = []
             for row in conn.execute(role_sql, tuple([self.db_id, self.db_id, self.db_id])):
                 if row['healing'] > row['damage']:
-                    healer_list.append(row['name'])
+                    healer_list.append((row['name'], row['healing']))
                 elif row['damage'] > row['overhealed']:
-                    dps_list.append(row['name'])
+                    dps_list.append((row['name'], row['damage']))
                 else: #if row['overhealed'] > row['healing'] and row['overhealed'] > row['damage']:
-                    tank_list.append(row['name'])
+                    tank_list.append((row['name'], row['overhealed']))
                         
                         
             conn.execute('''update combat set dps_list = ?, healer_list = ?, tank_list = ? where id = ?''', (dps_list, healer_list, tank_list, self.db_id))

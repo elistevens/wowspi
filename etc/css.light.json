@@ -1,0 +1,29 @@
+{
+    "background":       "#fff",
+    "text_default":     "#333",
+    "region_border":    "#bbb",
+    "time_second":      "#ddd",
+    "time_minute":      "#bbb",
+    
+    
+    "buff_Heroism": "#004",
+    
+    "heal_boss":        "#0f0",
+    "heal_pc_inst":     "#0f0",
+    "heal_pc_trend":    "#090",
+    "heal_pc_bar":      "#050",
+
+    "overheal_pc_inst":     "#ff0",
+    "overheal_pc_trend":    "#990",
+    "overheal_pc_bar":      "#550",
+
+    "dps_boss_trend":   "#b00",
+    "dps_boss_bar":     "#600",
+    "dps_trash_trend":  "#da0",
+    "dps_trash_bar":    "#860",
+    "dps_pc_inst":      "#f80",
+    "dps_pc_trend":     "#b05",
+    "dps_pc_bar":       "#602",
+    
+    "eof": "#f0f"
+}

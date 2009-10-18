@@ -84,7 +84,7 @@ def addImage(conn, combat, file_path, tab_str):
     
     div_str = '''<div class="tab" id="tab_%s">''' % tab_str
     comment_str = '''<!-- wowspi start -->%s<!-- wowspi end -->'''
-    img_str = '''<img src="%s" /><br /><br />''' % file_str
+    img_str = '''<br/><br/><br/><img src="%s" /><br /><br />''' % file_str
 
     index_str = file(os.path.join(combat['stasis_path'], 'index.html')).read()
     index_str = re.sub(div_str, div_str + (comment_str % img_str), index_str)
@@ -109,14 +109,14 @@ def runStasis(conn, options):
     
     subprocess.call(['cp', '-r', os.path.join(options.bin_path, 'extras'), options.stasis_path])
     
-    css_str = file(os.path.join(options.bin_path, 'extras', 'ses2.css')).read()
+    css_str = file(os.path.join(options.bin_path, 'extras', 'sws2.css')).read()
     new_str = '''.swsmaster div.tabContainer {
     text-align: center;
 }
 
-.swsmaster div.tabContainer div.tabBar, .swsmaster div.tabContainer tab {'''
+.swsmaster div.tabContainer div.tabBar, .swsmaster div.tabContainer div.tab table {'''
 
-    css_str = re.sub('''.swsmaster div.tabContainer {''', new_str, css_str)
+    css_str = css_str.replace('''.swsmaster div.tabContainer {''', new_str)
     
     file(os.path.join(options.stasis_path, 'extras', 'ses2.css'), 'w').write(css_str)
 
