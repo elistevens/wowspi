@@ -227,7 +227,7 @@ def sqlite_parseLog(conn, log_path, force=False):
         #print "trying to skip..."
         try:
             #print conn.execute('''select count(*) from event where path = ?''', (db_path,)).fetchone(), conn.execute('''select count(*) from event''').fetchone()
-            if conn.execute('''select count(*) from event where path = ?''', (log_path,)).fetchone()[0] > 0:
+            if conn.execute('''select 1 from event where path = ? limit 1''', (log_path,)).fetchone()[0] > 0:
             #if conn.execute('''select count(*) from event''').fetchone()[0] > 0:
                 #print "skipping..."
                 return

@@ -221,18 +221,16 @@ class LogCombat(object):
             healer_list = []
             tank_list = []
             for row in conn.execute(role_sql, tuple([self.db_id, self.db_id, self.db_id])):
-                if row['damage'] > row['healing'] and row['damage'] > row['overhealed']:
-                    dps_list.append(row['name'])
-                elif row['healing'] > row['damage'] and row['healing'] > row['overhealed']:
+                if row['healing'] > row['damage']:
                     healer_list.append(row['name'])
-                elif row['overhealed'] > row['healing'] and row['overhealed'] > row['damage']:
+                elif row['damage'] > row['overhealed']:
+                    dps_list.append(row['name'])
+                else: #if row['overhealed'] > row['healing'] and row['overhealed'] > row['damage']:
                     tank_list.append(row['name'])
                         
                         
             conn.execute('''update combat set dps_list = ?, healer_list = ?, tank_list = ? where id = ?''', (dps_list, healer_list, tank_list, self.db_id))
-                        
-                        
-                #conn.commit()
+            conn.commit()
 
 
     def eventIter(self):

@@ -13,6 +13,7 @@ import os
 import random
 import re
 import sqlite3
+import subprocess
 import sys
 import time
 import urllib
@@ -30,6 +31,16 @@ def usage(sys_argv):
     return op.parse_args(sys_argv)
 
 def usage_setup(op, **kwargs):
+    if kwargs.get('stasisbin', True):
+        op.add_option("--stasisbin"
+                , help="Path to (Apo)StasisCL executable; will run stasis into --stasisout."
+                , metavar="PATH"
+                , dest="bin_path"
+                , action="store"
+                , type="str"
+                #, default="armory.db"
+            )
+
     if kwargs.get('stasisout', True):
         op.add_option("--stasisout"
                 , help="Path to base dir for (Apo)StasisCL parses."
@@ -39,6 +50,7 @@ def usage_setup(op, **kwargs):
                 , type="str"
                 #, default="armory.db"
             )
+
 
 
 def matchCombatToStasis(conn, combat, stasisbase_path):
@@ -67,10 +79,56 @@ def matchCombatToStasis(conn, combat, stasisbase_path):
         
     return None
 
+def addImage(conn, combat, file_path, tab_str):
+    file_str = file_path.rsplit('/', 1)[-1]
+    
+    div_str = '''<div class="tab" id="tab_%s">''' % tab_str
+    comment_str = '''<!-- wowspi start -->%s<!-- wowspi end -->'''
+    img_str = '''<img src="%s" /><br /><br />''' % file_str
+
+    index_str = file(os.path.join(combat['stasis_path'], 'index.html')).read()
+    index_str = re.sub(div_str, div_str + (comment_str % img_str), index_str)
+        
+    file(os.path.join(combat['stasis_path'], 'index.html'), 'w').write(index_str)
+
+def removeImages(conn, combat):
+    index_str = file(os.path.join(combat['stasis_path'], 'index.html')).read()
+    index_str = re.sub('''<!-- wowspi start -->.*?<!-- wowspi end -->''', '', index_str)
+    file(os.path.join(combat['stasis_path'], 'index.html'), 'w').write(index_str)
+    
+def runStasis(conn, options):
+    cmd_list = [os.path.join(options.bin_path, 'stasis'), 'add', '-dir', options.stasis_path, '-file', options.log_path, '-server', options.realm_str, '-attempt', '-overall', '-combine', '-nav']
+
+    env_dict = copy.deepcopy(os.environ)
+    if 'PERL5LIB' in env_dict:
+        env_dict['PERL5LIB'] += (':%s' % os.path.join(options.bin_path, 'lib'))
+    else:
+        env_dict['PERL5LIB'] = os.path.join(options.bin_path, 'lib')
+    
+    subprocess.call(cmd_list, env=env_dict)
+    
+    subprocess.call(['cp', '-r', os.path.join(options.bin_path, 'extras'), options.stasis_path])
+    
+    css_str = file(os.path.join(options.bin_path, 'extras', 'ses2.css')).read()
+    new_str = '''.swsmaster div.tabContainer {
+    text-align: center;
+}
+
+.swsmaster div.tabContainer div.tabBar, .swsmaster div.tabContainer tab {'''
+
+    css_str = re.sub('''.swsmaster div.tabContainer {''', new_str, css_str)
+    
+    file(os.path.join(options.stasis_path, 'extras', 'ses2.css'), 'w').write(css_str)
+
+
 def main(sys_argv, options, arguments):
     combatlogorg.main(sys_argv, options, arguments)
     conn = combatlogparser.sqlite_connection(options)
     
+    if options.bin_path and not glob.glob(os.path.join(options.stasis_path, 'sws-*')):
+        print datetime.datetime.now(), "Running stasis into: %s" % options.stasis_path
+        runStasis(conn, options)
+        
     if options.stasis_path:
         combatlogparser.sqlite_insureColumns(conn, 'combat', [('stasis_path', 'str')])
     
