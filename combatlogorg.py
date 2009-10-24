@@ -374,7 +374,12 @@ def main(sys_argv, options, arguments):
         cur.execute('''select * from event order by time''')
         event_list = cur.fetchmany()
         
-        #for event in conn.execute('''select * from event order by time'''):#.fetchall():
+        # This loop is structured oddly so that we don't have to pull in all
+        # of the event list into memory at once.  Otherwise, four hours of
+        # tens raiding would consume about 400MB of RAM, and that won't work
+        # for hosted solutions.
+        # Note that combat.finalizeClose has to mess with the DB, so we can't
+        # have statements in progress while we fiddle with it.
         while event_list:
             event = event_list.pop(0)
         
@@ -397,42 +402,10 @@ def main(sys_argv, options, arguments):
                 event_list = []
                 
             if not event_list:
-                event_list += cur.fetchmany()
+                event_list = cur.fetchmany()
                 
         del cur
-        
-        #print datetime.datetime.now(), "Pruning combats..."
-        #combat_list = [combat for combat in combat_list if combat.prune(require_set)]
-        #
-        #print datetime.datetime.now(), "Saving to %s" % (options.db_path,)
-        #for combat in combat_list:
-        #    #combat.sqlite_updateEvents(conn)
-        #    combat.finalizeClose(conn, require_set)
-        #conn.commit()
 
-
-
-
-        #print datetime.datetime.now(), "Building combats..."
-        #combat_list = []
-        #for event in conn.execute('''select * from event order by time'''):#.fetchall():
-        #    if combat_list and combat_list[-1].isOpen():
-        #        combat_list[-1].addEvent(event)
-        #    else:
-        #        combat_list.append(LogCombat(event))
-        #
-        #print datetime.datetime.now(), "Pruning combats..."
-        #require_set = set()
-        #for name_str in armoryutils.getAllMobs():
-        #    require_set.add('NPC/' + name_str)
-        #    require_set.add('Mount/' + name_str)
-        #combat_list = [combat for combat in combat_list if combat.prune(require_set)]
-        #
-        #print datetime.datetime.now(), "Saving to %s" % (options.db_path,)
-        #for combat in combat_list:
-        #    #combat.sqlite_updateEvents(conn)
-        #    combat.finalizeClose(conn, require_set)
-        #conn.commit()
     except:
         #try:
         #    conn.execute('''drop table if exists combat''')
