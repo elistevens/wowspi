@@ -122,11 +122,37 @@
         "General Vezax": {
             "boss": ["General Vezax"],
             "mobs": ["Saronite Animus"],
+            "execution": {
+                "Mark of the Faceless": {
+                    "type": "runAwayDebuff",
+                    "debuffSpellId": 63276,
+                    "damageSpellId": 63278,
+                    "ignoredSeconds": 4
+                },
+                "Shadow Crash": {
+                    "type": "avoidableDamage",
+                    "damageSpellId": 62659,
+                    "ignoredSeconds": 0,
+                    "ignoredDamage": 0
+                }
+            },
             "stasis": "vezax"
         },
         "Yogg-Saron": {
             "boss": ["Guardian of Yogg-Saron", "Crusher Tentacle", "Brain of Yogg-Saron", "Yogg-Saron"],
-            "mobs": ["Corruptor Tentacle", "Constrictor Tentacle", "Immortal Guardian"]
+            "mobs": ["Corruptor Tentacle", "Constrictor Tentacle", "Immortal Guardian"],
+            "execution": {
+                "Death Ray": {
+                    "type": "avoidableDamage",
+                    "damageSpellId": 63884
+                },
+                "Lunatic Gaze": {
+                    "type": "avoidableDamage",
+                    "damageSpellId": 64164,
+                    "ignoredSeconds": 0,
+                    "ignoredDamage": 0
+                }
+            }
         },
         "Algalon": {
             "boss": ["Algalon the Observer"],

@@ -84,7 +84,7 @@ prefix_list = [
         ('SWING',               []),
         ('DAMAGE',              ['spellId', 'spellName', 'spellSchool']),
         ('RANGE',               ['spellId', 'spellName', 'spellSchool']),
-        ('ENVIRONMENTAL',       ['environmentalType']),
+        ('ENVIRONMENTAL',       ['environmental']),
         ('ENCHANT',             ['spellName', 'itemID', 'itemName']),
         ('UNIT',                []),
         ('PARTY',               []),
@@ -94,26 +94,26 @@ prefix_dict = dict(prefix_list)
 # See: _DAMAGE vs. _DURABILITY_DAMAGE
 suffix_list = [
         ('_DAMAGE',             ['amount', 'extra', 'school', 'resisted', 'blocked', 'absorbed', 'critical', 'glancing', 'crushing']),
-        ('_MISSED',             ['missType', '?amount']),
+        ('_MISSED',             ['miss', '?amount']),
         ('_HEAL',               ['amount', 'extra', 'absorbed', 'critical']),
-        ('_ENERGIZE',           ['amount', 'powerType']),
-        ('_DRAIN',              ['amount', 'powerType', 'extra']),
-        ('_LEECH',              ['amount', 'powerType', 'extra']),
+        ('_ENERGIZE',           ['amount', 'power']),
+        ('_DRAIN',              ['amount', 'power', 'extra']),
+        ('_LEECH',              ['amount', 'power', 'extra']),
         ('_INTERRUPT',          ['extraSpellID', 'extraSpellName', 'extraSchool']),
-        ('_DISPEL',             ['extraSpellID', 'extraSpellName', 'extraSchool', 'auraType']),
+        ('_DISPEL',             ['extraSpellID', 'extraSpellName', 'extraSchool', 'aura']),
         ('_DISPEL_FAILED',      ['extraSpellID', 'extraSpellName', 'extraSchool']),
-        ('_STOLEN',             ['extraSpellID', 'extraSpellName', 'extraSchool', 'auraType']),
+        ('_STOLEN',             ['extraSpellID', 'extraSpellName', 'extraSchool', 'aura']),
         ('_EXTRA_ATTACKS',      ['amount']),
-        ('_AURA_APPLIED',       ['auraType']),
-        ('_AURA_REMOVED',       ['auraType']),
-        ('_AURA_APPLIED_DOSE',  ['auraType', 'amount']),
-        ('_AURA_REMOVED_DOSE',  ['auraType', 'amount']),
-        ('_AURA_REFRESH',       ['auraType']),
-        ('_AURA_BROKEN',        ['auraType']),
-        ('_AURA_BROKEN_SPELL',  ['extraSpellID', 'extraSpellName', 'extraSchool', 'auraType']),
+        ('_AURA_APPLIED',       ['aura']),
+        ('_AURA_REMOVED',       ['aura']),
+        ('_AURA_APPLIED_DOSE',  ['aura', 'amount']),
+        ('_AURA_REMOVED_DOSE',  ['aura', 'amount']),
+        ('_AURA_REFRESH',       ['aura']),
+        ('_AURA_BROKEN',        ['aura']),
+        ('_AURA_BROKEN_SPELL',  ['extraSpellID', 'extraSpellName', 'extraSchool', 'aura']),
         ('_CAST_START',         []),
         ('_CAST_SUCCESS',       []),
-        ('_CAST_FAILED',        ['failedType']),
+        ('_CAST_FAILED',        ['failed']),
         ('_INSTAKILL',          []),
         ('_DURABILITY_DAMAGE',  []),
         ('_DURABILITY_DAMAGE_ALL',  []),
@@ -122,7 +122,7 @@ suffix_list = [
         ('_RESURRECT',          []),
         ('_SPLIT',              ['amount', 'extra', 'school', 'resisted', 'blocked', 'absorbed', 'critical', 'glancing', 'crushing']),
         ('_SHIELD',             ['amount', 'extra', 'school', 'resisted', 'blocked', 'absorbed', 'critical', 'glancing', 'crushing']),
-        ('_SHIELD_MISSED',      ['missType', '?amount']),
+        ('_SHIELD_MISSED',      ['miss', '?amount']),
         ('_REMOVED',            []),
         ('_APPLIED',            []),
         ('_DIED',               []),
@@ -133,26 +133,34 @@ suffix_dict = dict(suffix_list)
 
 
 
-actor_dict = {
-        0x0000000000000000: 'PC',
-        0x0010000000000000: 'Obj',
-        0x0030000000000000: 'NPC',
-        0x0040000000000000: 'Pet',
-        0x0050000000000000: 'Mount',
-        #0x0010000000000000: '1???',
-        #0x0050000000000000: '5???'
+flags_dict = {
+        ('Type', 0x0000FC00): {
+            0x00004000: 'Object',
+            0x00002000: 'Guardian',
+            0x00001000: 'Pet',
+            0x00000800: 'NPC',
+            0x00000400: 'PC',
+        },
+        ('Controller', 0x00000300): {
+            0x00000200: 'NPC',
+            0x00000100: 'PC',
+        },
+        ('Reaction', 0x000000F0): {
+            0x00000040: 'Hostile',
+            0x00000020: 'Neutral',
+            0x00000010: 'Friendly',
+        },
     }
 
-def actorType(guid):
-    return actor_dict.get(0x00F0000000000000 & guid, 'unknown:' + hex(0x00F0000000000000 & guid))
+def parseFlags(pre_str, event):
+    for post_str, mask in flags_dict:
+        bits = event[pre_str + 'Flags'] & mask
+        
+        event[pre_str + post_str] = flags_dict[(post_str, mask)].get(bits, 'Unknown:%x' % bits)
 
-eventSeen_dict = {}
-spellSeen_dict = {}
-actorSeen_dict = {}
+
 
 time_re = re.compile('(\\d+)/(\\d+) (\\d+):(\\d+):(\\d+).(\\d+)')
-
-
 
 def parseRow(row):
     """
@@ -210,10 +218,12 @@ def parseRow(row):
                     event[key] = int(value)
 
         for actor_str in ('source', 'dest'):
-            if event[actor_str + 'GUID']:
-                actorType_str = actorType(event[actor_str + 'GUID'])
-                event[actor_str + 'Type'] = actorType_str
-                event[actor_str + actorType_str] = True
+            parseFlags(actor_str, event)
+            
+            #if event[actor_str + 'GUID']:
+            #    actorType_str = actorType(event[actor_str + 'GUID'])
+            #    event[actor_str + 'Type'] = actorType_str
+            #    event[actor_str + actorType_str] = True
 
         return event
     except:
@@ -234,6 +244,8 @@ def sqlite_parseLog(conn, log_path, force=False):
         except Exception, e:
             #print e
             pass
+    else:
+        print datetime.datetime.now(), "With --force, parsing events"
 
     #col_list = ['time', 'eventType', 'prefix', 'suffix'] + list(fixed_list)
     col_list = []
@@ -249,7 +261,7 @@ def sqlite_parseLog(conn, log_path, force=False):
                 
     col_list.sort()
                 
-    col_list = ['time', 'eventType', 'prefix', 'suffix', 'sourceType', 'destType'] + list(fixed_list) + col_list
+    col_list = ['time', 'eventType', 'prefix', 'suffix', 'sourceType', 'sourceController', 'sourceReaction', 'destType', 'destController', 'destReaction'] + list(fixed_list) + col_list
 
 
     #print col_list
@@ -301,7 +313,7 @@ def main(sys_argv, options, arguments):
 
 
 if __name__ == "__main__":
-    options, arguments = usage(sys_argv)
+    options, arguments = usage(sys.argv[1:])
     sys.exit(main(sys.argv[1:], options, arguments) or 0)
 
 # eof
