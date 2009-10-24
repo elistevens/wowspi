@@ -20,8 +20,8 @@ import urllib2
 
 from PIL import Image, ImageDraw, ImageFont
 
-import combatlogparser
-import combatlogorg
+import basicparse
+import combatgroup
 import armoryutils
 import stasisutils
 from config import css, load_css, instanceData
@@ -31,10 +31,10 @@ from config import css, load_css, instanceData
 #htmlContent2 = """..."""
 
 def usage(sys_argv):
-    op = optparse.OptionParser()
+    op = optparse.OptionParser("Usage: wowspi %s [options]" % __file__.rsplit('/')[-1].split('.')[0])
     usage_setup(op)
-    combatlogorg.usage_setup(op)
-    combatlogparser.usage_setup(op)
+    combatgroup.usage_setup(op)
+    basicparse.usage_setup(op)
     armoryutils.usage_setup(op)
     stasisutils.usage_setup(op)
     return op.parse_args(sys_argv)
@@ -153,7 +153,7 @@ def usage_setup(op, **kwargs):
 #    image = Image.new('RGB', (int(image_width), int(image_height)))
 #    draw = ImageDraw.Draw(image)
 #    
-#    #armory_dict = combatlogparser.scrapeArmory(options, actor_dict)
+#    #armory_dict = basicparse.scrapeArmory(options, actor_dict)
 #    armory_dict = armoryutils.sqlite_scrapeCharacters(options.armorydb_path, actor_list, options.realm_str, options.region_str)
 #    color_dict = armoryutils.classColors()
 #
@@ -556,7 +556,7 @@ def region_dps(conn, combat, timeline, region_list):
 
 def main(sys_argv, options, arguments):
     stasisutils.main(sys_argv, options, arguments)
-    conn = combatlogparser.sqlite_connection(options)
+    conn = basicparse.sqlite_connection(options)
     
     if options.css_str:
         load_css(options.css_str)

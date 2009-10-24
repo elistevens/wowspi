@@ -1,0 +1,56 @@
+#!/usr/bin/env python
+
+import sys
+if sys.version_info < (2,6):
+    print "Python 2.6 or higher required; you have:"
+    print sys.version
+    sys.exit(1)
+
+import os
+wowspibin_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'bin'))
+sys.path.append(wowspibin_path)
+wowspisrc_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.append(wowspisrc_path)
+
+if len(sys.argv) == 1 or sys.argv[1] == '--help' or sys.argv[1] == '-h':
+    import glob
+    
+    module_list = []
+    for py_path in sorted(glob.glob(os.path.join(wowspibin_path, '*.py'))):
+        try:
+            module_str = py_path.rsplit('/')[-1].split('.')[0]
+            module = __import__(module_str)
+            module.usage
+            module.main
+            
+            module_list.append(module_str)
+        except:
+            #raise
+            pass
+        
+    print "Usage: wowspi <module> [options]"
+    print "Try the following modules for more information:"
+    for module_str in module_list:
+        print "    wowspi %s --help" % module_str
+
+    module_list = []
+    for py_path in sorted(glob.glob(os.path.join(wowspisrc_path, '*.py'))):
+        try:
+            module_str = py_path.rsplit('/')[-1].split('.')[0]
+            module = __import__(module_str)
+            module.usage
+            module.main
+            
+            module_list.append(module_str)
+        except:
+            #raise
+            pass
+        
+    print "Modules that implement intermediate steps (for internal use):"
+    for module_str in module_list:
+        print "    wowspi %s --help" % module_str
+    
+else:
+    module = __import__(sys.argv[1])
+    options, arguments = module.usage(sys.argv[2:])
+    sys.exit(module.main(sys.argv[2:], options, arguments) or 0)

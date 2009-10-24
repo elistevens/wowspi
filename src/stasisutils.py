@@ -20,14 +20,14 @@ import urllib
 import urllib2
 import xml.etree.ElementTree
 
-import combatlogparser
-import combatlogorg
+import basicparse
+import combatgroup
 import armoryutils
 
 def usage(sys_argv):
-    op = optparse.OptionParser()
+    op = optparse.OptionParser("Usage: wowspi %s [options]" % __file__.rsplit('/')[-1].split('.')[0])
     usage_setup(op)
-    combatlogparser.usage_setup(op)
+    basicparse.usage_setup(op)
     return op.parse_args(sys_argv)
 
 def usage_setup(op, **kwargs):
@@ -122,15 +122,15 @@ def runStasis(conn, options):
 
 
 def main(sys_argv, options, arguments):
-    combatlogorg.main(sys_argv, options, arguments)
-    conn = combatlogparser.sqlite_connection(options)
+    combatgroup.main(sys_argv, options, arguments)
+    conn = basicparse.sqlite_connection(options)
     
     if options.bin_path and not glob.glob(os.path.join(options.stasis_path, 'sws-*')):
         print datetime.datetime.now(), "Running stasis into: %s" % options.stasis_path
         runStasis(conn, options)
         
     if options.stasis_path:
-        combatlogparser.sqlite_insureColumns(conn, 'combat', [('stasis_path', 'str')])
+        basicparse.sqlite_insureColumns(conn, 'combat', [('stasis_path', 'str')])
     
         print datetime.datetime.now(), "Iterating over combat images (finding stasis parses)..."
         for combat in conn.execute('''select * from combat order by start_event_id''').fetchall():

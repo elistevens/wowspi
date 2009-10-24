@@ -21,7 +21,7 @@ from config import instanceData
 
 
 def usage(sys_argv):
-    op = optparse.OptionParser()
+    op = optparse.OptionParser("Usage: wowspi %s [options]" % __file__.rsplit('/')[-1].split('.')[0])
     usage_setup(op)
     return op.parse_args(sys_argv)
 

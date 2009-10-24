@@ -20,15 +20,15 @@ import urllib
 import urllib2
 import xml.etree.ElementTree
 
-import combatlogparser
-import combatlogorg
+import basicparse
+import combatgroup
 import armoryutils
 from config import css, load_css, instanceData
 
 def usage(sys_argv):
-    op = optparse.OptionParser()
+    op = optparse.OptionParser("Usage: wowspi %s [options]" % __file__.rsplit('/')[-1].split('.')[0])
     usage_setup(op)
-    combatlogparser.usage_setup(op)
+    basicparse.usage_setup(op)
     return op.parse_args(sys_argv)
 
 def usage_setup(op, **kwargs):
@@ -54,14 +54,14 @@ def usage_setup(op, **kwargs):
 def getAllPresent(conn, combat):
     where_list = []
     
-    start_event = combatlogorg.getEventData(conn, id=combat['start_event_id']).fetchone()
-    end_event = combatlogorg.getEventData(conn, id=combat['end_event_id']).fetchone()
+    start_event = combatgroup.getEventData(conn, id=combat['start_event_id']).fetchone()
+    end_event = combatgroup.getEventData(conn, id=combat['end_event_id']).fetchone()
     
     where_list.append(('''time >= ?''', start_event['time']))
     where_list.append(('''time <= ?''', end_event['time'] - datetime.timedelta(seconds=60)))
     
     present_dict = {}
-    for row in combatlogorg.getEventData(conn, 'distinct sourceName', where_list, sourceType='PC'):
+    for row in combatgroup.getEventData(conn, 'distinct sourceName', where_list, sourceType='PC'):
         present_dict[row['sourceName']] = 0
         
     return present_dict, where_list
@@ -74,7 +74,7 @@ def runAwayDebuff(conn, combat, debuffSpellId, damageSpellId, ignoredSeconds=0, 
     application_dict = {}
     
     current = None
-    for event in combatlogorg.getEventData(conn, '*', where_list, 'time', spellId=(debuffSpellId, damageSpellId), destType='PC'):
+    for event in combatgroup.getEventData(conn, '*', where_list, 'time', spellId=(debuffSpellId, damageSpellId), destType='PC'):
         if event['eventType'] == 'SPELL_AURA_APPLIED':
             current = event
             application_dict.setdefault(event['destName'], [])
@@ -116,7 +116,7 @@ def avoidableDamage(conn, combat, damageSpellId=0, ignoredSeconds=0, ignoredDama
     application_dict = {}
     
     current = None
-    for event in combatlogorg.getEventData(conn, '*', where_list, 'time', spellId=damageSpellId, destType='PC'):
+    for event in combatgroup.getEventData(conn, '*', where_list, 'time', spellId=damageSpellId, destType='PC'):
         if damageSpellId == 64164:
             print event
         application_dict.setdefault(event['destName'], [])
@@ -150,7 +150,7 @@ def chainLightning(conn, combat, spellId, ignoredTargets=2):
 
     fail_list = []
     process_list = []
-    for event in combatlogorg.getEventData(conn, '*', where_list, spellId=spellId, prefix='SPELL', destType='PC'):
+    for event in combatgroup.getEventData(conn, '*', where_list, spellId=spellId, prefix='SPELL', destType='PC'):
         if not fail_list or fail_list[-1][-1]['time'] + datetime.timedelta(seconds=0.5) > event['time']:
             fail_list.append([event])
         else:
@@ -204,8 +204,8 @@ def avgDictsPerKey(dict_list):
 
 
 def main(sys_argv, options, arguments):
-    combatlogorg.main(sys_argv, options, arguments)
-    conn = combatlogparser.sqlite_connection(options)
+    combatgroup.main(sys_argv, options, arguments)
+    conn = basicparse.sqlite_connection(options)
     
     #if options.bin_path and not glob.glob(os.path.join(options.stasis_path, 'sws-*')):
     #    print datetime.datetime.now(), "Running stasis into: %s" % options.stasis_path

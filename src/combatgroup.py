@@ -16,13 +16,13 @@ import time
 import urllib
 import urllib2
 
-import combatlogparser
+import basicparse
 import armoryutils
 
 def usage(sys_argv):
-    op = optparse.OptionParser()
+    op = optparse.OptionParser("Usage: wowspi %s [options]" % __file__.rsplit('/')[-1].split('.')[0])
     usage_setup(op)
-    combatlogparser.usage_setup(op)
+    basicparse.usage_setup(op)
     return op.parse_args(sys_argv)
 
 def usage_setup(op, **kwargs):
@@ -328,8 +328,8 @@ def getEventData(conn, select_str='*', where_list=None, orderBy=None, **kwargs):
     return conn.execute(('''select %s from event where ''' % select_str) + ' and '.join(sql_list) + orderBy, tuple(arg_list))
 
 def main(sys_argv, options, arguments):
-    combatlogparser.main(sys_argv, options, arguments)
-    conn = combatlogparser.sqlite_connection(options)
+    basicparse.main(sys_argv, options, arguments)
+    conn = basicparse.sqlite_connection(options)
     
     if not options.force:
         try:
@@ -340,7 +340,7 @@ def main(sys_argv, options, arguments):
             pass
 
     try:
-        combatlogparser.sqlite_insureColumns(conn, 'event', [('segment_id', 'int'), ('combat_id', 'int'), ('wound_dict', 'json'), ('active_dict', 'json'), ('absorbType', 'str'), ('absorbName', 'str')])
+        basicparse.sqlite_insureColumns(conn, 'event', [('segment_id', 'int'), ('combat_id', 'int'), ('wound_dict', 'json'), ('active_dict', 'json'), ('absorbType', 'str'), ('absorbName', 'str')])
         
         conn.execute('''update event set segment_id = ?, combat_id = ?, wound_dict = ?, active_dict = ?''', (0, 0, {}, {}))
         

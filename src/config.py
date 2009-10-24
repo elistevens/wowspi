@@ -20,14 +20,14 @@ import urllib
 import urllib2
 import xml.etree.ElementTree
 
-#import combatlogparser
-#import combatlogorg
+#import basicparse
+#import combatgroup
 #import armoryutils
 #
 #def usage(sys_argv):
 #    op = optparse.OptionParser()
 #    usage_setup(op)
-#    combatlogparser.usage_setup(op)
+#    basicparse.usage_setup(op)
 #    return op.parse_args(sys_argv)
 #
 #def usage_setup(op, **kwargs):
@@ -52,7 +52,9 @@ import xml.etree.ElementTree
 #            )
 #
 
-_instance_dict = json.load(file(os.path.join('etc', 'instancedata.json')))
+wowspi_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+
+_instance_dict = json.load(file(os.path.join(wowspi_path, 'etc', 'instancedata.json')))
 def instanceData():
     return copy.deepcopy(_instance_dict)
 
@@ -67,15 +69,15 @@ def css(color_str):
 def load_css(name_str='default'):
     global _css_dict
     
-    _css_dict = json.load(file(os.path.join('etc', 'css.%s.json' % name_str)))
+    _css_dict = json.load(file(os.path.join(wowspi_path, 'etc', 'css.%s.json' % name_str)))
     
 load_css()
     
 
 
 def main(sys_argv, options, arguments):
-    #combatlogorg.main(sys_argv, options, arguments)
-    #conn = combatlogparser.sqlite_connection(options)
+    #combatgroup.main(sys_argv, options, arguments)
+    #conn = basicparse.sqlite_connection(options)
     pass
 
 
