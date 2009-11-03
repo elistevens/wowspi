@@ -5,15 +5,15 @@ Required packages
 -----------------
 
 * Python 2.6+, untested on higher
-        http://www.python.org/
+    http://www.python.org/
 * Python Imaging Library (PIL) 1.1.6 
-        http://www.pythonware.com/products/pil/
+    http://www.pythonware.com/products/pil/
 
 Optional packages
 -----------------
 
 * apostasis 
-        http://code.google.com/p/apostasis/
+    http://code.google.com/p/apostasis/
 * Perl 5, enough extra packages to run apostasis (see that project page).  I
     used perl 5 and have the PERL5LIB environment variable name hardcoded ATM.
 
@@ -30,36 +30,55 @@ python 2.5).  Bug reports for higher versions of python welcome.
 Command line arguments
 ----------------------
 
-    $ python activitygraph.py --help
-    Usage: activitygraph.py [options]
+$ ./wowspi --help
+Usage: wowspi <module> [options]
+
+Try the following modules for more information:
+    wowspi activitygraph --help
+    wowspi execution --help
+
+Modules that implement intermediate steps (for internal use):
+    wowspi armoryutils --help
+    wowspi basicparse --help
+    wowspi combatgroup --help
+    wowspi stasisutils --help
     
-    Options:
-      -h, --help        show this help message and exit
-      --css=NAME        Use color settings from etc/css.NAME.json to render
-                        images.
-      --force           Force reparsing from scratch.
-      --db=OUTPUT       Desired sqlite database output file name.
-      --log=LOGFILE     Path to the WoWCombatLog.txt file.
-      --armorydb=DB     Desired sqlite database output file name.
-      --realm=REALM     Realm to use for armory data queries.
-      --region=REGION   Region to use for armory data queries (www, eu, kr, cn,
-                        tw).
-      --stasisbin=PATH  Path to (Apo)StasisCL executable; will run stasis into
-                        --stasisout.
-      --stasisout=PATH  Path to base dir for (Apo)StasisCL parses.
+$ ./wowspi activitygraph --help
+Usage: wowspi activitygraph [options]
+
+Options:
+  -h, --help        show this help message and exit
+  --css=NAME        Use color settings from etc/css.NAME.json to render
+                    images.
+  --force           Force reparsing from scratch.
+  --date=DATE       Use DATE for standard log files and db names.  Overrides
+                    --db and --log.
+  --db=OUTPUT       Desired sqlite database output file name.
+  --log=LOGFILE     Path to the WoWCombatLog.txt file.
+  -v, --verbose     Print more output; may include debugging information not
+                    intended for end-users.
+  --armorydb=DB     Desired sqlite database output file name.
+  --realm=REALM     Realm to use for armory data queries.
+  --region=REGION   Region to use for armory data queries (www, eu, kr, cn,
+                    tw).
+  --stasisbin=PATH  Path to (Apo)StasisCL executable; will run stasis into
+                    --stasisout.
+  --stasisout=PATH  Path to base dir for (Apo)StasisCL parses.
+        
 
 In general, wowspi will attempt to not repeat steps in the processing chain
 unless the --force option is given.
 
-    $ python activitygraph.py --log WoWCombatLog-2009-10-11_19-35-00.txt
-            --db testparse/2009-10-11/events.db
-            --stasisbin ../apostasis-read-only
-            --stasisout testparse/2009-10-11
-            --force
+    $ ./wowspi activitygraph --log WoWCombatLog-2009-10-11_19-35-00.txt
+        --db testparse/2009-10-11/events.db
+        --stasisbin ../apostasis-read-only
+        --stasisout testparse/2009-10-11
+        --force
 
 Performance
 -----------
 
 On the author's Mac Pro, parsing 4 hours of 10s raiding took about 20 minutes
-from start to finish and peaked at around 400MB of RAM consumed (this includes
-a full stasis parse).  No serious performance optimization has been performed.
+from start to finish and peaked at around 60MB of RAM consumed (this includes
+a full stasis parse).  Only very casual performance optimization has been
+performed.
