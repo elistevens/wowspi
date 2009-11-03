@@ -25,11 +25,19 @@ import combatgroup
 import armoryutils
 from config import css, load_css, instanceData
 
+from sqliteutils import *
+
 def usage(sys_argv):
     op = optparse.OptionParser("Usage: wowspi %s [options]" % __file__.rsplit('/')[-1].split('.')[0])
     usage_setup(op)
     basicparse.usage_setup(op)
-    return op.parse_args(sys_argv)
+    
+    options, arguments = op.parse_args(sys_argv)
+    
+    basicparse.usage_defaults(options)
+
+    return options, arguments
+
 
 def usage_setup(op, **kwargs):
     if kwargs.get('dps', True):
@@ -54,14 +62,16 @@ def usage_setup(op, **kwargs):
 def getAllPresent(conn, combat):
     where_list = []
     
-    start_event = combatgroup.getEventData(conn, id=combat['start_event_id']).fetchone()
-    end_event = combatgroup.getEventData(conn, id=combat['end_event_id']).fetchone()
+    start_event = basicparse.getEventData(conn, id=combat['start_event_id']).fetchone()
+    end_event = basicparse.getEventData(conn, id=combat['end_event_id']).fetchone()
     
     where_list.append(('''time >= ?''', start_event['time']))
-    where_list.append(('''time <= ?''', end_event['time'] - datetime.timedelta(seconds=60)))
+    where_list.append(('''time <= ?''', end_event['time']))
+    where_list.append(('''combat = ?''', combat['id']))
+    where_list.append(('''wipe = ?''', 0))
     
     present_dict = {}
-    for row in combatgroup.getEventData(conn, 'distinct sourceName', where_list, sourceType='PC'):
+    for row in basicparse.getEventData(conn, 'distinct sourceName', where_list, sourceType='PC'):
         present_dict[row['sourceName']] = 0
         
     return present_dict, where_list
@@ -74,7 +84,7 @@ def runAwayDebuff(conn, combat, debuffSpellId, damageSpellId, ignoredSeconds=0, 
     application_dict = {}
     
     current = None
-    for event in combatgroup.getEventData(conn, '*', where_list, 'time', spellId=(debuffSpellId, damageSpellId), destType='PC'):
+    for event in basicparse.getEventData(conn, '*', where_list, 'time', spellId=(debuffSpellId, damageSpellId), destType='PC'):
         if event['eventType'] == 'SPELL_AURA_APPLIED':
             current = event
             application_dict.setdefault(event['destName'], [])
@@ -116,7 +126,7 @@ def avoidableDamage(conn, combat, damageSpellId=0, ignoredSeconds=0, ignoredDama
     application_dict = {}
     
     current = None
-    for event in combatgroup.getEventData(conn, '*', where_list, 'time', spellId=damageSpellId, destType='PC'):
+    for event in basicparse.getEventData(conn, '*', where_list, 'time', spellId=damageSpellId, destType='PC'):
         if damageSpellId == 64164:
             print event
         application_dict.setdefault(event['destName'], [])
@@ -150,7 +160,7 @@ def chainLightning(conn, combat, spellId, ignoredTargets=2):
 
     fail_list = []
     process_list = []
-    for event in combatgroup.getEventData(conn, '*', where_list, spellId=spellId, prefix='SPELL', destType='PC'):
+    for event in basicparse.getEventData(conn, '*', where_list, spellId=spellId, prefix='SPELL', destType='PC'):
         if not fail_list or fail_list[-1][-1]['time'] + datetime.timedelta(seconds=0.5) > event['time']:
             fail_list.append([event])
         else:
@@ -204,37 +214,44 @@ def avgDictsPerKey(dict_list):
 
 
 def main(sys_argv, options, arguments):
-    combatgroup.main(sys_argv, options, arguments)
-    conn = basicparse.sqlite_connection(options)
-    
-    #if options.bin_path and not glob.glob(os.path.join(options.stasis_path, 'sws-*')):
-    #    print datetime.datetime.now(), "Running stasis into: %s" % options.stasis_path
-    #    runStasis(conn, options)
-    
-    overall_dict = {}
-    
-    
-    print datetime.datetime.now(), "Iterating over combats (finding execution failures)..."
-    for combat in conn.execute('''select * from combat order by start_event_id''').fetchall():
+    try:
+        combatgroup.main(sys_argv, options, arguments)
+        conn = sqlite_connection(options)
         
-        for fail_str, args_dict in instanceData()[combat['instance']][combat['encounter']].get('execution', {}).items():
-            fail_dict = globals().get(args_dict['type'])(conn, combat, **dict([(str(k), v) for k,v in args_dict.items()]))
+        #if options.bin_path and not glob.glob(os.path.join(options.stasis_path, 'sws-*')):
+        #    print datetime.datetime.now(), "Running stasis into: %s" % options.stasis_path
+        #    runStasis(conn, options)
+        
+        overall_dict = {}
+        
+        
+        print datetime.datetime.now(), "Iterating over combats (finding execution failures)..."
+        for combat in conn_execute(conn, '''select * from combat order by start_event_id''').fetchall():
             
-            #for k,v in sorted(fail_dict.items(), key=lambda x: (-x[1], x[0])):
-            #    print combat['id'], combat['encounter'], fail_str, k, v
+            start_dt = conn_execute(conn, '''select time from event where id = ?''', (combat['start_event_id'],))
+            end_dt = conn_execute(conn, '''select time from event where id = ?''', (combat['end_event_id'],))
+            
+            if (end_dt - start_dt) >= datetime.timedelta(seconds=110):
+                for fail_str, args_dict in instanceData()[combat['instance']][combat['encounter']].get('execution', {}).items():
+                    fail_dict = globals().get(args_dict['type'])(conn, combat, **dict([(str(k), v) for k,v in args_dict.items()]))
+                    
+                    #for k,v in sorted(fail_dict.items(), key=lambda x: (-x[1], x[0])):
+                    #    print combat['id'], combat['encounter'], fail_str, k, v
+                        
+                    overall_dict.setdefault((combat['instance'], combat['encounter'], fail_str), [])
+                    overall_dict[(combat['instance'], combat['encounter'], fail_str)].append(fail_dict)
                 
-            overall_dict.setdefault((combat['instance'], combat['encounter'], fail_str), [])
-            overall_dict[(combat['instance'], combat['encounter'], fail_str)].append(fail_dict)
-            
-    for key in sorted(overall_dict):
-        for k,v in sorted(normalize(avgDictsPerKey(overall_dict[key])).items(), key=lambda x: (-x[1], x[0])):
-            print "overall", key, k, v
-        
+        for key in sorted(overall_dict):
+            for k,v in sorted(normalize(avgDictsPerKey(overall_dict[key])).items(), key=lambda x: (-x[1], x[0])):
+                print "overall", key, k, v
+    finally:
+        sqlite_print_perf(options.verbose)
+        pass
 
 
 
 if __name__ == "__main__":
     options, arguments = usage(sys.argv[1:])
     sys.exit(main(sys.argv[1:], options, arguments) or 0)
-
+    
 # eof

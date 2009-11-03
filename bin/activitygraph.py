@@ -25,6 +25,7 @@ import combatgroup
 import armoryutils
 import stasisutils
 from config import css, load_css, instanceData
+from sqliteutils import *
 
 #version = None
 #htmlContent1 = """..."""
@@ -33,11 +34,18 @@ from config import css, load_css, instanceData
 def usage(sys_argv):
     op = optparse.OptionParser("Usage: wowspi %s [options]" % __file__.rsplit('/')[-1].split('.')[0])
     usage_setup(op)
-    combatgroup.usage_setup(op)
     basicparse.usage_setup(op)
+    combatgroup.usage_setup(op)
     armoryutils.usage_setup(op)
     stasisutils.usage_setup(op)
-    return op.parse_args(sys_argv)
+    
+    options, arguments = op.parse_args(sys_argv)
+    
+    basicparse.usage_defaults(options)
+    stasisutils.usage_defaults(options)
+    
+    return options, arguments
+
 
 def usage_setup(op, **kwargs):
     if kwargs.get('css', True):
@@ -50,141 +58,7 @@ def usage_setup(op, **kwargs):
                 #, default="output"
             )
 
-
-#
-#class Timeslice(object):
-#    def __init__(self, event_list, end_time=None, width=0.2):
-#        #self.actor = actor
-#        #self.prev = prev
-#        self.width = width
-#        self.leftover = 0.0
-#        self.cast_dict = {}
-#        self.swing_dict = {}
-#        self.died_dict = {}
-#        self.healing_dict = collections.defaultdict(int)
-#        self.overhealing_dict = collections.defaultdict(int)
-#        self.damage_dict = collections.defaultdict(int)
-#        self.wound_dict = collections.defaultdict(int)
-#        self.event_list = []
-#
-#        self.healTarget_dict = collections.defaultdict(set)
-#        self.damageTarget_dict = collections.defaultdict(set)
-#        #self.next = None
-#        
-#        self.id_set = set()
-#
-#        #event_iter = iter(event_list)
-#
-#        while event_list:
-#            event = event_list.pop()
-#
-#            if not end_time:
-#                end_time = event['time'] + datetime.timedelta(seconds=self.width)
-#
-#            if not self.event_list and event['time'] > end_time:
-#                end_time = event['time'] + datetime.timedelta(seconds=self.width)
-#
-#            if event['time'] > end_time:
-#                event_list.append(event)
-#                #print event['time'], end_time
-#                #self.next = Timeslice([event] + list(event_iter), end_time + datetime.timedelta(seconds=self.width), width)
-#                break
-#
-#            self.event_list.append(event)
-#            self.id_set.add(event['id'])
-#
-#            if event['sourceType'] == 'PC':
-#                if event['prefix'] in ('SWING',):
-#                    self.swing_dict[event['sourceName']] = 1
-#
-#                if event['suffix'] in ('_CAST_START', '_CAST_SUCCESS'):
-#                    self.cast_dict[event['sourceName']] = 1
-#
-#                if event['suffix'] == '_HEAL':
-#                    self.healing_dict[event['sourceName']] += event['amount'] - event['extra']
-#                    self.overhealing_dict[event['sourceName']] += event['extra']
-#                    self.healTarget_dict[event['sourceName']].add(event['destName'])
-#
-#                if event['suffix'] == '_DAMAGE':
-#                    self.damage_dict[event['sourceName']] += event['amount'] - event['extra']
-#                    self.damageTarget_dict[event['sourceName']].add(event['destName'])
-#
-#            if event['destType'] == 'PC' and event['suffix'] == '_DIED':
-#                self.died_dict[event['destName']] = 1
-#
-#            for actor in event['wound_dict'] or {}:
-#                self.wound_dict[actor] = max(self.wound_dict[actor], event['wound_dict'][actor])
-#                
-#    def getTotalDamage(self, conn, **kwargs):
-#        select_str = '''select sum(amount) amount, sum(extra) extra from event where '''
-#        where_list = ['''id in (%s)''' % ','.join([str(x) for x in self.id_set]), '''suffix = "_DAMAGE"''']
-#        arg_list = []
-#        for k, v in kwargs.items():
-#            if isinstance(v, str):
-#                where_list.append('''%s = ?''' % k)
-#                arg_list.append(v)
-#            else:
-#                where_list.append('''%s in ?''' % k)
-#                arg_list.append(v)
-#        
-#        row = conn.execute(select_str + ' and '.join(where_list), tuple(arg_list)).fetchone()
-#
-#    #def getList(self):
-#    #    if self.next:
-#    #        return [self] + self.next.getList()
-#    #
-#    #    return [self]
-#
-##class CombatImage(object):
-##    def __init__(self, timeslice_list, *actor_list):
-#def castImage(options, file_path, start_time, actor_dict, actor_list=None, font_path='/Library/Fonts/Arial Bold.ttf'):
-#
-#    font = ImageFont.load_default()#ImageFont.truetype(font_path, 14, encoding="unic")
-#
-#    if actor_list:
-#        tmp_dict = {}
-#        for actor in actor_list:
-#            tmp_dict[actor] = actor_dict[actor]
-#        actor_dict = tmp_dict
-#
-#    image_width = 1000
-#    image_height = 40 + 100 * len(actor_dict)
-#
-#    image = Image.new('RGB', (int(image_width), int(image_height)))
-#    draw = ImageDraw.Draw(image)
-#    
-#    #armory_dict = basicparse.scrapeArmory(options, actor_dict)
-#    armory_dict = armoryutils.sqlite_scrapeCharacters(options.armorydb_path, actor_list, options.realm_str, options.region_str)
-#    color_dict = armoryutils.classColors()
-#
-#    for i in range(10):
-#        draw.line([(i * 100, 0), (i * 100, image_height)], fill='#333')
-#
-#
-#    currentHeight = 20
-#    for actor, delta_dict in sorted(actor_dict.items()):
-#        draw.line([(0, currentHeight), (image_width, currentHeight)], fill='#333')
-#
-#        draw.text((5, currentHeight + 3), actor, font=font, fill='#999')
-#
-#        light_color = color_dict[armory_dict[actor]['class']][2]
-#        dark_color = '#%02x%02x%02x' % tuple([int(x * 0.5) for x in color_dict[armory_dict[actor]['class']][0]])
-#
-#        line_list = []
-#        for i in range(101):
-#            line_list.append((i * 10, currentHeight + 100 - min(delta_dict[i], 50) * 2))
-#
-#            if delta_dict[i]:
-#                draw.line([(i * 10, currentHeight + 100 - (min(delta_dict[i], 50) * 2)), (i * 10, currentHeight + 100)], fill=dark_color)
-#        draw.line(line_list, fill=light_color)
-#
-#        currentHeight += 100
-#
-#    draw.line([(0, currentHeight), (image_width, currentHeight)], fill='#333')
-#    draw.text((5, 3), str(start_time), font=font, fill='#999')
-#
-#    image.save(file_path)
-
+    
 
 class Timeline(object):
     def __init__(self, conn, start_dt, end_dt, width=0.2):
@@ -223,7 +97,7 @@ class Timeline(object):
         else:
             return (self.start_dt + (self.width_td * index)) <= check_dt and (self.start_dt + (self.width_td * (index+1))) > check_dt
         
-    def getEventData(self, index, select_str='*', where_list=None, **kwargs):
+    def getEventData(self, index, select_str='*', where_list=None, orderBy=None, **kwargs):
         """
         Examples of use:
             Total healing done to PCs:
@@ -240,7 +114,28 @@ class Timeline(object):
         
         where_list.append(('''time >= ?''', self.start_dt + (self.width_td * index)))
         where_list.append(('''time < ?''',  self.start_dt + (self.width_td * (index+1))))
+        
+        return basicparse.getEventData(self.conn, select_str, where_list, orderBy, **kwargs)
 
+    def getAuraData(self, index, select_str='*', where_list=None, orderBy=None, **kwargs):
+        """
+        Examples of use:
+            Total healing done to PCs:
+            lambda timeline, index: timeline.getEventData(index, 'sum(amount) - sum(extra)', suffix='_HEAL', destType='PC').fetchone()[0]
+
+            Total healing done to Bosses (like at Vezax):
+            lambda timeline, index: timeline.getEventData(index, 'sum(amount) - sum(extra)', suffix='_HEAL', destType='NPC').fetchone()[0]
+            
+            If a given player cast something:
+            lambda timeline, index: timeline.getEventData(index, 'count(*)', suffix=('_CAST_START', '_CAST_SUCCESS'), sourceName='Tantryst').fetchone()[0] != 0
+        """
+        
+        if where_list is None:
+            where_list = []
+        
+        where_list.append(('''end_time >= ?''', self.start_dt + (self.width_td * index)))
+        where_list.append(('''start_time <= ?''',  self.start_dt + (self.width_td * (index+1))))
+        
         sql_list = []
         arg_list = []
         for tup in where_list:
@@ -255,9 +150,13 @@ class Timeline(object):
             else:
                 sql_list.append('''%s = ?''' % k)
                 arg_list.append(v)
-        #if index % 500 == 0:
-        #    print ('''select %s from event where ''' % select_str) + ' and '.join(sql_list), tuple(arg_list)
-        return self.conn.execute(('''select %s from event where ''' % select_str) + ' and '.join(sql_list), tuple(arg_list))
+        ##if index % 500 == 0:
+        ##    print ('''select %s from event where ''' % select_str) + ' and '.join(sql_list), tuple(arg_list)
+        
+        return self.conn.execute(('''select %s from aura where ''' % select_str) + ' and '.join(sql_list), tuple(arg_list))
+        
+        #return conn_execute(conn, '''select %s from aura where start_time <= ? and end_time >= ?''', (self.start_dt + (self.width_td * (index+1)), self.start_dt + (self.width_td * index)))
+
 
 class Region(object):
     def __init__(self, timeline, label_str, graph_list, width, height, parent_region=None, parent_relationship='under', border=False):
@@ -291,7 +190,7 @@ class Region(object):
             graph.render(draw, self)
             
         if self.label_str:
-            draw.text((self.getLeft() -95, self.getTop() + 3), self.label_str, font=ImageFont.load_default(), fill=css('text_default'))
+            draw.text((self.getLeft() -95, self.getTop() + 3), self.label_str, font=ImageFont.load_default(), fill=css('text.regionTitle'))
         if self.border:
             draw.line([(0, self.getBottom()), (self.getRight(), self.getBottom())], fill=css('region_border'))
 
@@ -437,7 +336,7 @@ class TimeGraph(Graph):
             next_dt = start_dt + tick_td
             for i in range(len(region.timeline)):
                 if region.timeline.containsTime(next_dt, i):
-                    draw.line([(i + region.getLeft(), 10000), (i + region.getLeft(), 0)], fill=css('time_second'))
+                    draw.line([(i + region.getLeft(), 10000), (i + region.getLeft(), 0)], fill=css('time.second'))
                     next_dt += tick_td
                     
         tick_td = datetime.timedelta(seconds=60)
@@ -445,7 +344,7 @@ class TimeGraph(Graph):
         next_dt = start_dt + tick_td
         for i in range(len(region.timeline)):
             if region.timeline.containsTime(next_dt, i):
-                draw.line([(i + region.getLeft(), 10000), (i + region.getLeft(), 0)], fill=css('time_minute'))
+                draw.line([(i + region.getLeft(), 10000), (i + region.getLeft(), 0)], fill=css('time.minute'))
                 next_dt += tick_td
 
 class DeathGraph(Graph):
@@ -469,33 +368,117 @@ class DeathGraph(Graph):
                 
             draw.line([(index + region.getLeft(), 10000), (index + region.getLeft(), 0)], fill=color_dict[self.char_dict[death['destName']]['class']][2])
 
-class HeroismGraph(Graph):
-    def __init__(self):
-        pass
 
+class SpanGraph(Graph):
+    def __init__(self, label, limit=True):
+        self.limit = limit
+        self.label = label
+        self.css_str = self.label
+        
     def computeValues(self, region):
+        self.index_list = []
+        
         return 0
-    
+        
     def render(self, draw, region):
-        heroism_count = 0
+        if not self.index_list:
+            return
+        
+        span_index = 0
+        for index in self.index_list:
+            #if index > self.index_list[span_index][1]:
+            #    span_index += 1
+            #if span_index > len(self.index_list):
+            #    return
+            
+            #if index > self.index_list[span_index][0]:
+                if self.limit:
+                    draw.line([(index + region.getLeft(), region.getBottom()), (index + region.getLeft(), region.getTop())], fill=css(self.css_str))
+                else:
+                    draw.line([(index + region.getLeft(), 10000), (index + region.getLeft(), 0)], fill=css(self.css_str))
+                
+        if self.label:
+            last = -2
+            for index in self.index_list:
+                if index != last+1:
+                    draw.text((region.getLeft() + index + 5, region.getTop() + 3), self.label, font=ImageFont.load_default(), fill=css('text.' + self.css_str))
+                last = index
+            
+class AuraGraph(SpanGraph):
+    def __init__(self, buff, label=None, limit=True, **kwargs):
+        SpanGraph.__init__(self, label or buff, limit)
+        
+        self.buff = buff
+        self.kwargs = kwargs
+        self.css_str = 'aura.' + self.buff
+        
+    def computeValues(self, region):
+        self.index_list = []
         
         for index in range(len(region.timeline)):
-            heroism_count += region.timeline.getEventData(index, 'count(*)', eventType='SPELL_AURA_APPLIED', spellName="Heroism", destType='PC').fetchone()[0]
-            heroism_count -= region.timeline.getEventData(index, 'count(*)', eventType='SPELL_AURA_REMOVED', spellName="Heroism", destType='PC').fetchone()[0]
+            count = region.timeline.getAuraData(index, 'count(*)', spellName=self.buff, **self.kwargs).fetchone()[0]
+                
+            if count:
+                self.index_list.append(index)
+        
+        return 0
 
-            heroism_count += region.timeline.getEventData(index, 'count(*)', eventType='SPELL_AURA_APPLIED', spellName="Bloodlust", destType='PC').fetchone()[0]
-            heroism_count -= region.timeline.getEventData(index, 'count(*)', eventType='SPELL_AURA_REMOVED', spellName="Bloodlust", destType='PC').fetchone()[0]
-            
-            if heroism_count > 0:
-                draw.line([(index + region.getLeft(), 10000), (index + region.getLeft(), 0)], fill=css('buff_Heroism'))
+class WipeGraph(SpanGraph):
+    def __init__(self):
+        SpanGraph.__init__(self, "Wipe", False)
+        
+        #self.kwargs = kwargs
+        
+    def computeValues(self, region):
+        self.index_list = []
+        
+        count = 0
+        for index in range(len(region.timeline)):
+            count += region.timeline.getEventData(index, 'count(*)', wipe=1).fetchone()[0]
+                
+            if count:
+                self.index_list.append(index)
+        
+        return 0
 
-def region_title(conn, combat, timeline, region_list):
+#class _HeroismGraph(Graph):
+#    def __init__(self, needsLabel=False):
+#        self.needsLabel = needsLabel
+#        pass
+#
+#    def computeValues(self, region):
+#        return 0
+#    
+#    def render(self, draw, region):
+#        heroism_count = 0
+#        start_index = 0
+#        
+#        for index in range(len(region.timeline)):
+#            heroism_count += region.timeline.getEventData(index, 'count(*)', eventType='SPELL_AURA_APPLIED', spellName="Heroism", destType='PC').fetchone()[0]
+#            heroism_count -= region.timeline.getEventData(index, 'count(*)', eventType='SPELL_AURA_REMOVED', spellName="Heroism", destType='PC').fetchone()[0]
+#
+#            heroism_count += region.timeline.getEventData(index, 'count(*)', eventType='SPELL_AURA_APPLIED', spellName="Bloodlust", destType='PC').fetchone()[0]
+#            heroism_count -= region.timeline.getEventData(index, 'count(*)', eventType='SPELL_AURA_REMOVED', spellName="Bloodlust", destType='PC').fetchone()[0]
+#            
+#            if heroism_count > 0:
+#                if not start_index:
+#                    start_index = index
+#                    
+#                draw.line([(index + region.getLeft(), 10000), (index + region.getLeft(), 0)], fill=css('buff_Heroism'))
+#
+#        if self.needsLabel:
+#            draw.text((region.getLeft() + start_index + 5, region.getTop() + 3), "Hero", font=ImageFont.load_default(), fill=css('text_default'))
+
+
+def region_title(conn, combat, timeline, region_list, options):
     char_list = [x['sourceName'] for x in conn.execute('''select distinct sourceName from event where combat_id = ? and sourceType = ?''', (combat['id'], 'PC')).fetchall()]
     char_dict = armoryutils.sqlite_scrapeCharacters(options.armorydb_path, char_list, options.realm_str, options.region_str)
     
-    region_list.extend([Region(timeline, '%s: %s, %s' % (combat['instance'], combat['encounter'], timeline.start_dt), [DeathGraph(char_dict), TimeGraph(), HeroismGraph()], len(timeline), 20)])
+    region_list.extend([Region(timeline, '%s: %s, %s' % (combat['instance'], combat['encounter'], timeline.start_dt),
+            [DeathGraph(char_dict), TimeGraph(), WipeGraph(), AuraGraph("Heroism", "Hero", False)],
+            len(timeline), 20)])
     
-def region_bossDpsHealing(conn, combat, timeline, region_list):
+def region_bossDpsHealing(conn, combat, timeline, region_list, options):
     graph_list = []
     graph_list.append(Graph([('upline', css('heal_boss'))],
             lambda timeline, index: timeline.getEventData(index, 'sum(amount) - sum(extra)', suffix='_HEAL', destType=('NPC','Mount')).fetchone()[0] or 0,
@@ -509,7 +492,7 @@ def region_bossDpsHealing(conn, combat, timeline, region_list):
             smoothing=[3,3,3,5]))
     region_list.append(Region(timeline, "Player DPS / Boss Healing", graph_list, len(timeline), 0.005, region_list[-1], 'under', True))
     
-def region_healers(conn, combat, timeline, region_list):
+def region_healers(conn, combat, timeline, region_list, options):
     toon_dict = armoryutils.sqlite_scrapeCharacters(options.armorydb_path, [], options.realm_str, options.region_str)
     color_dict = armoryutils.classColors()
     
@@ -519,6 +502,10 @@ def region_healers(conn, combat, timeline, region_list):
                 lambda timeline, index: timeline.getEventData(index, 'count(*)', suffix=('_CAST_START', '_CAST_SUCCESS'), sourceName=healer_str).fetchone()[0] != 0,
                 smoothing=None))
         region_list.append(Region(timeline, ("%s: %s" % (healer_str, healer_int)), graph_list, len(timeline), 15, region_list[-1], 'under'))
+
+        graph_list = []
+        graph_list.append(AuraGraph("Mark of the Faceless", "MotF", True, destType='PC', destName=healer_str))
+        region_list.append(Region(timeline, "Auras", graph_list, len(timeline), 15, region_list[-1], 'under'))
 
         graph_list = []
         graph_list.append(Graph([('upbar', css('heal_pc_inst'))],
@@ -532,7 +519,7 @@ def region_healers(conn, combat, timeline, region_list):
                 smoothing=None))
         region_list.append(Region(timeline, "  Overhealing", graph_list, len(timeline), 0.005, region_list[-1], 'under', True))
         
-def region_dps(conn, combat, timeline, region_list):
+def region_dps(conn, combat, timeline, region_list, options):
     toon_dict = armoryutils.sqlite_scrapeCharacters(options.armorydb_path, [], options.realm_str, options.region_str)
     color_dict = armoryutils.classColors()
     
@@ -542,6 +529,10 @@ def region_dps(conn, combat, timeline, region_list):
                 lambda timeline, index: timeline.getEventData(index, 'count(*)', suffix=('_CAST_START', '_CAST_SUCCESS'), sourceName=dps_str).fetchone()[0] != 0,
                 smoothing=None))
         region_list.append(Region(timeline, ("%s: %s" % (dps_str, dps_int)), graph_list, len(timeline), 15, region_list[-1], 'under'))
+
+        graph_list = []
+        graph_list.append(AuraGraph("Mark of the Faceless", "MotF", True, destType='PC', destName=dps_str))
+        region_list.append(Region(timeline, "Auras", graph_list, len(timeline), 15, region_list[-1], 'under'))
 
         graph_list = []
         graph_list.append(Graph([('upbar', css('dps_boss_bar')), ('upline', css('dps_boss_trend'))],
@@ -555,60 +546,64 @@ def region_dps(conn, combat, timeline, region_list):
 
 
 def main(sys_argv, options, arguments):
-    stasisutils.main(sys_argv, options, arguments)
-    conn = basicparse.sqlite_connection(options)
-    
-    if options.css_str:
-        load_css(options.css_str)
-    
-    print datetime.datetime.now(), "Iterating over combat images..."
-    for combat in conn.execute('''select * from combat order by start_event_id''').fetchall():
+    try:
+        stasisutils.main(sys_argv, options, arguments)
+        conn = basicparse.sqlite_connection(options)
         
-        #if combat['id'] < 5:
-        #    continue
-
-        time_list = [x['time'] for x in conn.execute('''select time from event where combat_id = ?''', (combat['id'],)).fetchall()]
-        start_dt = min(time_list)
-        end_dt = max(time_list)
+        if options.css_str:
+            load_css(options.css_str)
         
-        timeline = Timeline(conn, start_dt, end_dt, width=0.5)
-
-        if combat['stasis_path']:
-            stasisutils.removeImages(conn, combat)
-                
-        file_list = []
-        file_list.append(re.sub('[^a-zA-Z0-9_-]', '_', combat['instance']))
-        file_list.append(re.sub('[^a-zA-Z0-9_-]', '_', combat['encounter']))
-        file_list.append(re.sub('[^a-zA-Z0-9_-]', '_', str(timeline.start_dt)).rsplit('.', 1)[0].replace(':', '-'))
-        file_list.append('%s')
-        
-        file_base = '_'.join(file_list) + '.png'
-        
-        print datetime.datetime.now(), "Rendering: %s" % (file_base % '...')
+        print datetime.datetime.now(), "Iterating over combat images..."
+        for combat in conn.execute('''select * from combat order by start_event_id''').fetchall():
             
-        for type_str in ('damage_out', 'healing', 'damage_in'):
+            #if combat['id'] < 5:
+            #    continue
+    
+            time_list = [x['time'] for x in conn.execute('''select time from event where combat_id = ?''', (combat['id'],)).fetchall()]
+            start_dt = min(time_list)
+            end_dt = max(time_list)
+            
+            timeline = Timeline(conn, start_dt, end_dt, width=0.5)
+    
             if combat['stasis_path']:
-                file_path = os.path.join(combat['stasis_path'], file_base % type_str)
-                stasisutils.addImage(conn, combat, file_path, type_str)
-            elif options.stasis_path:
-                file_path = os.path.join(options.stasis_path, file_base % type_str)
+                stasisutils.removeImages(conn, combat)
+                    
+            file_list = []
+            file_list.append(re.sub('[^a-zA-Z0-9_-]', '_', combat['instance']))
+            file_list.append(re.sub('[^a-zA-Z0-9_-]', '_', combat['encounter']))
+            file_list.append(re.sub('[^a-zA-Z0-9_-]', '_', str(timeline.start_dt)).rsplit('.', 1)[0].replace(':', '-'))
+            file_list.append('%s')
             
+            file_base = '_'.join(file_list) + '.png'
             
-            region_list = []
-            region_title(conn, combat, timeline, region_list)
-            region_bossDpsHealing(conn, combat, timeline, region_list)
-            if type_str == 'damage_out':
-                region_dps(conn, combat, timeline, region_list)
-            if type_str == 'healing':
-                region_healers(conn, combat, timeline, region_list)
-            
-            image = Image.new('RGB', (int(region_list[0].getRight()), int(max([x.getBottom() for x in region_list]))), css('background'))
-            draw = ImageDraw.Draw(image)
-    
-            for region in region_list:
-                region.render(draw)
-            
-            image.save(file_path)
+            print datetime.datetime.now(), "Rendering: %s" % (file_base % '...')
+                
+            for type_str in ('damage_out', 'healing', 'damage_in'):
+                if combat['stasis_path']:
+                    file_path = os.path.join(combat['stasis_path'], file_base % type_str)
+                    stasisutils.addImage(conn, combat, file_path, type_str)
+                elif options.stasis_path:
+                    file_path = os.path.join(options.stasis_path, file_base % type_str)
+                
+                
+                region_list = []
+                region_title(conn, combat, timeline, region_list, options)
+                region_bossDpsHealing(conn, combat, timeline, region_list, options)
+                if type_str == 'damage_out':
+                    region_dps(conn, combat, timeline, region_list, options)
+                if type_str == 'healing':
+                    region_healers(conn, combat, timeline, region_list, options)
+                
+                image = Image.new('RGB', (int(region_list[0].getRight()), int(max([x.getBottom() for x in region_list]))), css('background'))
+                draw = ImageDraw.Draw(image)
+        
+                for region in region_list:
+                    region.render(draw)
+                
+                image.save(file_path)
+    finally:
+        sqlite_print_perf(options.verbose)
+        pass
             
 
 

@@ -60,11 +60,21 @@ def instanceData():
 
 
 _css_dict = {}
-def css(color_str):
-    if color_str not in _css_dict:
-        print "Color name not found:", color_str
+_notFound_dict = {}
+def css(color_str, default='#f0f'):
+    css_str = color_str
+    
+    while css_str not in _css_dict and '.' in css_str:
+        css_str = css_str.rsplit('.', 1)[0]
         
-    return _css_dict.get(color_str, '#f0f')
+    if css_str not in _css_dict:
+        css_str = color_str
+
+    if color_str not in _css_dict and color_str not in _notFound_dict:
+        print "CSS name not found: %s, using %s" % (color_str, css_str)
+        _notFound_dict[color_str] = 1
+        
+    return _css_dict.get(css_str, default)
    
 def load_css(name_str='default'):
     global _css_dict
@@ -75,15 +85,15 @@ load_css()
     
 
 
-def main(sys_argv, options, arguments):
-    #combatgroup.main(sys_argv, options, arguments)
-    #conn = basicparse.sqlite_connection(options)
-    pass
-
-
-
-if __name__ == "__main__":
-    options, arguments = usage(sys.argv[1:])
-    sys.exit(main(sys.argv[1:], options, arguments) or 0)
+#def main(sys_argv, options, arguments):
+#    #combatgroup.main(sys_argv, options, arguments)
+#    #conn = basicparse.sqlite_connection(options)
+#    pass
+#
+#
+#
+#if __name__ == "__main__":
+#    options, arguments = usage(sys.argv[1:])
+#    sys.exit(main(sys.argv[1:], options, arguments) or 0)
 
 # eof

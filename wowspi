@@ -9,8 +9,8 @@ if sys.version_info < (2,6):
 import os
 wowspibin_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'bin'))
 sys.path.append(wowspibin_path)
-wowspisrc_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'src'))
-sys.path.append(wowspisrc_path)
+wowspilib_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'lib'))
+sys.path.append(wowspilib_path)
 
 if len(sys.argv) == 1 or sys.argv[1] == '--help' or sys.argv[1] == '-h':
     import glob
@@ -29,12 +29,12 @@ if len(sys.argv) == 1 or sys.argv[1] == '--help' or sys.argv[1] == '-h':
             pass
         
     print "Usage: wowspi <module> [options]"
-    print "Try the following modules for more information:"
+    print "\nTry the following modules for more information:"
     for module_str in module_list:
         print "    wowspi %s --help" % module_str
 
     module_list = []
-    for py_path in sorted(glob.glob(os.path.join(wowspisrc_path, '*.py'))):
+    for py_path in sorted(glob.glob(os.path.join(wowspilib_path, '*.py'))):
         try:
             module_str = py_path.rsplit('/')[-1].split('.')[0]
             module = __import__(module_str)
@@ -46,7 +46,7 @@ if len(sys.argv) == 1 or sys.argv[1] == '--help' or sys.argv[1] == '-h':
             #raise
             pass
         
-    print "Modules that implement intermediate steps (for internal use):"
+    print "\nModules that implement intermediate steps (for internal use):"
     for module_str in module_list:
         print "    wowspi %s --help" % module_str
     

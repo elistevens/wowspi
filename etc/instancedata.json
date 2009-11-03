@@ -113,7 +113,7 @@
         },
         "Thorim": {
             "boss": ["Thorim", "Runic Colossus", "Ancient Rune Giant"],
-            "mobs": ["Dark Rune Champion", "Dark Rune Evoker", "Dark Rune Warbringer", "Dark Rune Commoner", "Dark Rune Acolyte", "Iron Ring Guard", "Iron Honor Guard"]
+            "mobs": ["Dark Rune Champion", "Dark Rune Evoker", "Dark Rune Warbringer", "Dark Rune Commoner", "Iron Ring Guard", "Iron Honor Guard"]
         },
         "Hodir": {
             "boss": ["Hodir"],

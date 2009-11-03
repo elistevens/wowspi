@@ -2,8 +2,6 @@
     "background":       "#000",
     "text_default":     "#999",
     "region_border":    "#444",
-    "time_second":      "#222",
-    "time_minute":      "#444",
     
     
     "buff_Heroism": "#004",
@@ -24,6 +22,24 @@
     "dps_pc_inst":      "#f80",
     "dps_pc_trend":     "#b05",
     "dps_pc_bar":       "#602",
+    
+    
+    
+    "text": "#999",
+    "text.aura": "#888",
+
+    "time.second":      "#222",
+    "time.minute":      "#444",
+
+    
+    "aura": "#609",
+    "aura.Heroism": "#004",
+    "aura.Bloodlust": "#004",
+
+    "aura.Mark of the Faceless": "#040",
+
+    "Wipe": "#400",
+    
     
     "eof": "#f0f"
 }

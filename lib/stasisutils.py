@@ -24,11 +24,21 @@ import basicparse
 import combatgroup
 import armoryutils
 
+import config
+
 def usage(sys_argv):
-    op = optparse.OptionParser("Usage: wowspi %s [options]" % __file__.rsplit('/')[-1].split('.')[0])
-    usage_setup(op)
-    basicparse.usage_setup(op)
-    return op.parse_args(sys_argv)
+    options = optparse.OptionParser("Usage: wowspi %s [options]" % __file__.rsplit('/')[-1].split('.')[0])
+    usage_setup(options)
+    basicparse.usage_setup(options)
+    
+   
+    options, arguments = op.parse_args(sys_argv)
+    
+    basicparse.usage_defaults(options)
+    usage_defaults(options)
+    
+    return options, arguments
+
 
 def usage_setup(op, **kwargs):
     if kwargs.get('stasisbin', True):
@@ -51,6 +61,23 @@ def usage_setup(op, **kwargs):
                 #, default="armory.db"
             )
 
+def usage_defaults(options):
+    #print "before", options
+    if options.date_str:
+        options.stasis_path = os.path.join(config.wowspi_path, 'data', 'reports', options.date_str)
+    #    
+    #    #print options
+    #else:
+    #    if hasattr(options, 'log_path') and re.match('^[0-9]{4}-[0-9]{2}-[0-9]{2}$', options.log_path):
+    #        try:
+    #            options.log_path = (glob.glob(options.log_path) + glob.glob(os.path.join(config.wowspi_path, 'data', 'logs', '*' + options.log_path + '*')))[0]
+    #        except:
+    #            pass
+    #        
+    #    if hasattr(options, 'db_path') and re.match('^[0-9]{4}-[0-9]{2}-[0-9]{2}$', options.db_path):
+    #        options.db_path = os.path.join(config.wowspi_path, 'data', 'parses', options.db_path + '.db')
+    #
+    ##return options, arguments
 
 
 def matchCombatToStasis(conn, combat, stasisbase_path):
