@@ -76,6 +76,10 @@ def conn_execute(conn, sql_str, values_tup=None):
             return conn.execute(sql_str, values_tup)
         else:
             return conn.execute(sql_str)
+    except:
+        print sql_str
+        print values_tup
+        raise
     finally:
         _time_dict[sql_str] += datetime.datetime.now() - n
         

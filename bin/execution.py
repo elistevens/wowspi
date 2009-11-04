@@ -120,15 +120,13 @@ def runAwayDebuff(conn, combat, debuffSpellId, damageSpellId, ignoredSeconds=0, 
     
 
 
-def avoidableDamage(conn, combat, damageSpellId=0, ignoredSeconds=0, ignoredDamage=0, **kwargs):
+def avoidableDamage(conn, combat, damageSpellId=0, ignoredSeconds=0, ignoredDamage=0, binary=False, **kwargs):
     fail_dict, where_list = getAllPresent(conn, combat)
 
     application_dict = {}
     
     current = None
-    for event in basicparse.getEventData(conn, '*', where_list, 'time', spellId=damageSpellId, destType='PC'):
-        if damageSpellId == 64164:
-            print event
+    for event in basicparse.getEventData(conn, '*', where_list, 'time', suffix='_DAMAGE', spellId=damageSpellId, destType='PC'):
         application_dict.setdefault(event['destName'], [])
         
         if application_dict[event['destName']] and application_dict[event['destName']][-1][0]['time'] + datetime.timedelta(seconds=4) > event['time']:
@@ -145,22 +143,26 @@ def avoidableDamage(conn, combat, damageSpellId=0, ignoredSeconds=0, ignoredDama
         
         fail_dict[destName_str] = 0
         for event, damage_list in application_list:
-            print [x['amount'] for x in damage_list], damageSpellId
+            #print [x['amount'] for x in damage_list], damageSpellId
             
             while damage_list and event['time'] + ignored_td > damage_list[0]['time']:
                 damage_list.pop(0)
-            fail_dict[destName_str] += sum([x['amount'] - ignoredDamage for x in damage_list if x['amount'] and x['amount'] - ignoredDamage > 0])
+
+            if binary:
+                fail_dict[destName_str] += len([x['amount'] - ignoredDamage for x in damage_list if x['amount'] and x['amount'] - ignoredDamage > 0])
+            else:
+                fail_dict[destName_str] += sum([x['amount'] - ignoredDamage for x in damage_list if x['amount'] and x['amount'] - ignoredDamage > 0])
             
     return fail_dict
 
 
 
-def chainLightning(conn, combat, spellId, ignoredTargets=2):
+def chainLightning(conn, combat, damageSpellId, ignoredTargets=2):
     fail_dict, where_list = getAllPresent(conn, combat)
 
     fail_list = []
     process_list = []
-    for event in basicparse.getEventData(conn, '*', where_list, spellId=spellId, prefix='SPELL', destType='PC'):
+    for event in basicparse.getEventData(conn, '*', where_list, 'time', spellId=damageSpellId, suffix='_DAMAGE', destType='PC'):
         if not fail_list or fail_list[-1][-1]['time'] + datetime.timedelta(seconds=0.5) > event['time']:
             fail_list.append([event])
         else:
@@ -175,6 +177,26 @@ def chainLightning(conn, combat, spellId, ignoredTargets=2):
             
     return fail_dict
 
+
+def clumpDebuff(conn, combat, debuffSpellId, ignoredTargets=2):
+    fail_dict, where_list = getAllPresent(conn, combat)
+
+    fail_list = []
+    process_list = []
+    for event in basicparse.getEventData(conn, '*', where_list, spellId=debuffSpellId, eventType='SPELL_AURA_APPLIED', destType='PC'):
+        if not fail_list or fail_list[-1][-1]['time'] + datetime.timedelta(seconds=0.5) > event['time']:
+            fail_list.append([event])
+        else:
+            fail_list[-1].append(event)
+            
+    #fail_dict = {}
+    for process_list in fail_list:
+        if len(process_list) > ignoredTargets:
+            for event in process_list:
+                fail_dict.setdefault(event['destName'], 0)
+                fail_dict[event['destName']] += len(process_list) - ignoredTargets
+            
+    return fail_dict
 
 
 def normalize(fail_dict):

@@ -162,15 +162,49 @@
     "Trial of the Crusader": {
         "Northrend Beasts": {
             "boss": ["Gormok the Impaler","Acidmaw","Dreadscale","Icehowl"],
-            "mobs": []
+            "mobs": [],
+            "execution": {
+                "Fire Bomb": {
+                    "type": "avoidableDamage",
+                    "damageSpellId": 66320,
+                    "ignoredSeconds": 0,
+                    "ignoredDamage": 0
+                },
+                "Paralytic Toxin": {
+                    "type": "clumpDebuff",
+                    "ignoredTargets": 1,
+                    "debuffSpellId": 66823
+                },
+                "Slime Pool": {
+                    "type": "avoidableDamage",
+                    "damageSpellId": [67638, 67641],
+                    "ignoredSeconds": 0,
+                    "ignoredDamage": 0
+                },
+                "Trample": {
+                    "type": "avoidableDamage",
+                    "damageSpellId": 66734,
+                    "binary": 1,
+                    "ignoredSeconds": 0,
+                    "ignoredDamage": 0
+                }
+            }
         },
         "Lord Jaraxxus": {
             "boss": ["Lord Jaraxxus"],
-            "mobs": []
+            "mobs": [],
+            "execution": {
+                "Fel Lightning": {
+                    "type": "chainLightning",
+                    "damageSpellId": 67029,
+                    "ignoredTargets": 2
+                }
+            }
         },
         "Twin Val'kyr": {
             "boss": ["Eydis Darkbane","Fjola Lightbane"],
-            "mobs": []
+            "mobs": [],
+            "stasis": "twinvalkyrs"
         },
         "Faction Champions": {
             "boss": ["Gorgrim Shadowcleave","Birana Stormhoof","Erin Misthoof","Ruj'kah","Ginselle Blightslinger","Liandra Suncaller",
@@ -190,7 +224,16 @@
     "Onyxia's Lair": {
         "Onyxia": {
             "boss": ["Onyxia"],
-            "mobs": ["Onyxian Lair Guard", "Onyxian Whelp"]
+            "mobs": ["Onyxian Lair Guard", "Onyxian Whelp"],
+            "execution": {
+                "Tail Sweep": {
+                    "type": "avoidableDamage",
+                    "damageSpellId": [ 68867, 69286 ],
+                    "binary": 1,
+                    "ignoredSeconds": 0,
+                    "ignoredDamge": 0
+                }
+            }
         }
     }
 }

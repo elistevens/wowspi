@@ -124,6 +124,8 @@ def removeImages(conn, combat):
     file(os.path.join(combat['stasis_path'], 'index.html'), 'w').write(index_str)
     
 def runStasis(conn, options):
+    if not os.path.exists(options.stasis_path):
+        os.mkdir(options.stasis_path)
     cmd_list = [os.path.join(options.bin_path, 'stasis'), 'add', '-dir', options.stasis_path, '-file', options.log_path, '-server', options.realm_str, '-attempt', '-overall', '-combine', '-nav']
 
     env_dict = copy.deepcopy(os.environ)
@@ -146,6 +148,7 @@ def runStasis(conn, options):
     css_str = css_str.replace('''.swsmaster div.tabContainer {''', new_str)
     
     file(os.path.join(options.stasis_path, 'extras', 'ses2.css'), 'w').write(css_str)
+    subprocess.call(['rm', '-rf', os.path.join(options.stasis_path, 'extras', '.svn')])
 
 
 def main(sys_argv, options, arguments):

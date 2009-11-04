@@ -219,6 +219,14 @@ def parseRow(row):
     10/21 20:59:04.873  SPELL_DAMAGE,0x000000000142C9BE,"Autogun",0x514,0xF130005967003326,"High Warlord Naj'entus",0xa48,27209,"Shadow Bolt",0x20,2233,0,32,220,0,0,nil,nil,nil
     """
     #print row
+    
+    #tmp = []
+    #for x in row:
+    #    if isinstance(x, str):
+    #        tmp.append(unicode(x, 'utf8'))
+    #    else:
+    #        tmp.append(x)
+    #row = tmp
 
     rowCopy = list(row)
     event = {}
@@ -267,6 +275,10 @@ def parseRow(row):
                     event[key] = int(value[2:], 16)
                 elif re.match(r"^-?\d+$", value):
                     event[key] = int(value)
+                else:
+                    event[key] = unicode(value, 'utf8')
+            #else:
+            #    print repr(key), repr(value)
 
         for actor_str in ('source', 'dest'):
             parseFlags(actor_str, event)
@@ -385,6 +397,9 @@ def getEventData(conn, select_str='*', where_list=None, orderBy=None, **kwargs):
         if isinstance(v, tuple):
             sql_list.append('''%s in (%s)''' % (k, ','.join(['?' for x in v])))
             arg_list.extend(v)
+        elif isinstance(v, list):
+            sql_list.append('''%s in (%s)''' % (k, ','.join(['?' for x in v])))
+            arg_list.extend(tuple(v))
         else:
             sql_list.append('''%s = ?''' % k)
             arg_list.append(v)
