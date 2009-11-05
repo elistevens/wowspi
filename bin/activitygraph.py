@@ -361,8 +361,8 @@ class DeathGraph(Graph):
         color_dict = armoryutils.classColors()
         
         index = 0
-        for death in conn_execute(region.timeline.conn, '''select time, destName from event where time >= ? and time <= ? and eventType = ? and destType = ? order by time''',
-                                     (region.timeline.start_dt, region.timeline.end_dt, 'UNIT_DIED', 'PC')).fetchall():
+        for death in conn_execute(region.timeline.conn, '''select time, destName from event where time >= ? and time <= ? and eventType = ? and destType = ? and fakeDeath = ? order by time''',
+                                     (region.timeline.start_dt, region.timeline.end_dt, 'UNIT_DIED', 'PC', 0)).fetchall():
             while not region.timeline.containsTime(death['time'], index):
                 index += 1
                 

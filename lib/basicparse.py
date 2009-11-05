@@ -348,7 +348,7 @@ def parseLog(conn, log_path, force=False):
     conn.commit()
     
 def flagFakeDeaths(conn):
-    sqlite_insureColumns(conn, 'event', [('fakeDeath', 'int')])
+    sqlite_insureColumns(conn, 'event', [('fakeDeath', 'int default 0')])
     
     update_list = []
     
