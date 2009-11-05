@@ -18,6 +18,7 @@ import urllib2
 import xml.etree.ElementTree
 
 from config import instanceData
+from sqliteutils import *
 
 
 def usage(sys_argv):
@@ -65,13 +66,13 @@ def sqlite_scrapeCharacters(db_path, name_list, realm_str, region_str, maxAge_td
     conn.row_factory = sqlite3.Row
     
     try:
-        row_list = conn.execute('''select name from toon where updatedAt > ?''', (datetime.datetime.now() - maxAge_td,))
+        row_list = conn_execute(conn, '''select name from toon where updatedAt > ?''', (datetime.datetime.now() - maxAge_td,))
         #print "row_list", row_list
     except Exception, e:
         print "Dropping...", e
         row_list = []
-        conn.execute('''drop table if exists toon''')
-        conn.execute('''create table toon (id integer primary key, updatedAt timestamp, %s, specName1, specPoints1, specName2, specPoints2)''' % ', '.join(armoryField_list))
+        conn_execute(conn, '''drop table if exists toon''')
+        conn_execute(conn, '''create table toon (id integer primary key, updatedAt timestamp, %s, specName1, specPoints1, specName2, specPoints2)''' % ', '.join(armoryField_list))
         
     name_set = set()
     for row in row_list:
@@ -90,10 +91,10 @@ def sqlite_scrapeCharacters(db_path, name_list, realm_str, region_str, maxAge_td
                 col_list = [x[0] for x in colval_list]
                 val_list = [x[1] for x in colval_list]
                 
-                conn.execute('''insert into toon (updatedAt, %s) values (?, %s) ''' % (', '.join(col_list), ', '.join(['?' for x in col_list])), tuple([datetime.datetime.now()] + val_list))
+                conn_execute(conn, '''insert into toon (updatedAt, %s) values (?, %s) ''' % (', '.join(col_list), ', '.join(['?' for x in col_list])), tuple([datetime.datetime.now()] + val_list))
     conn.commit()
     
-    return dict([(x['name'], x) for x in conn.execute('''select * from toon''').fetchall()])
+    return dict([(x['name'], x) for x in conn_execute(conn, '''select * from toon''').fetchall()])
     
     
     

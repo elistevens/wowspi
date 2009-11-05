@@ -153,7 +153,7 @@ class Timeline(object):
         ##if index % 500 == 0:
         ##    print ('''select %s from event where ''' % select_str) + ' and '.join(sql_list), tuple(arg_list)
         
-        return self.conn.execute(('''select %s from aura where ''' % select_str) + ' and '.join(sql_list), tuple(arg_list))
+        return conn_execute(self.conn, ('''select %s from aura where ''' % select_str) + ' and '.join(sql_list), tuple(arg_list))
         
         #return conn_execute(conn, '''select %s from aura where start_time <= ? and end_time >= ?''', (self.start_dt + (self.width_td * (index+1)), self.start_dt + (self.width_td * index)))
 
@@ -361,7 +361,7 @@ class DeathGraph(Graph):
         color_dict = armoryutils.classColors()
         
         index = 0
-        for death in region.timeline.conn.execute('''select time, destName from event where time >= ? and time <= ? and eventType = ? and destType = ? order by time''',
+        for death in conn_execute(region.timeline.conn, '''select time, destName from event where time >= ? and time <= ? and eventType = ? and destType = ? order by time''',
                                      (region.timeline.start_dt, region.timeline.end_dt, 'UNIT_DIED', 'PC')).fetchall():
             while not region.timeline.containsTime(death['time'], index):
                 index += 1
@@ -471,7 +471,7 @@ class WipeGraph(SpanGraph):
 
 
 def region_title(conn, combat, timeline, region_list, options):
-    char_list = [x['sourceName'] for x in conn.execute('''select distinct sourceName from event where combat_id = ? and sourceType = ?''', (combat['id'], 'PC')).fetchall()]
+    char_list = [x['sourceName'] for x in conn_execute(conn, '''select distinct sourceName from event where combat_id = ? and sourceType = ?''', (combat['id'], 'PC')).fetchall()]
     char_dict = armoryutils.sqlite_scrapeCharacters(options.armorydb_path, char_list, options.realm_str, options.region_str)
     
     region_list.extend([Region(timeline, '%s: %s, %s' % (combat['instance'], combat['encounter'], timeline.start_dt),
@@ -554,12 +554,12 @@ def main(sys_argv, options, arguments):
             load_css(options.css_str)
         
         print datetime.datetime.now(), "Iterating over combat images..."
-        for combat in conn.execute('''select * from combat order by start_event_id''').fetchall():
+        for combat in conn_execute(conn, '''select * from combat order by start_event_id''').fetchall():
             
             #if combat['id'] < 5:
             #    continue
     
-            time_list = [x['time'] for x in conn.execute('''select time from event where combat_id = ?''', (combat['id'],)).fetchall()]
+            time_list = [x['time'] for x in conn_execute(conn, '''select time from event where combat_id = ?''', (combat['id'],)).fetchall()]
             start_dt = min(time_list)
             end_dt = max(time_list)
             

@@ -7,50 +7,66 @@ if sys.version_info < (2,6):
     sys.exit(1)
 
 import os
-wowspibin_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'bin'))
-sys.path.append(wowspibin_path)
-wowspilib_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'lib'))
-sys.path.append(wowspilib_path)
+def env_setup():
+    wowspibin_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'bin'))
+    sys.path.append(wowspibin_path)
+    wowspilib_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'lib'))
+    sys.path.append(wowspilib_path)
 
-if len(sys.argv) == 1 or sys.argv[1] == '--help' or sys.argv[1] == '-h':
-    import glob
-    
-    module_list = []
-    for py_path in sorted(glob.glob(os.path.join(wowspibin_path, '*.py'))):
-        try:
-            module_str = py_path.rsplit('/')[-1].split('.')[0]
-            module = __import__(module_str)
-            module.usage
-            module.main
-            
-            module_list.append(module_str)
-        except:
-            #raise
-            pass
+import optparse
+import glob
+def usage(sys_argv):
+    module_dict = {}
+    for path_str in ('bin', 'lib'):
+        module_dict[path_str] = []
         
-    print "Usage: wowspi <module> [options]"
-    print "\nTry the following modules for more information:"
-    for module_str in module_list:
-        print "    wowspi %s --help" % module_str
+        #print glob.glob(os.path.join(os.path.dirname(__file__), path_str, '*.py'))
+        
+        for py_path in sorted(glob.glob(os.path.join(os.path.dirname(__file__), path_str, '*.py'))):
+            try:
+                module_str = py_path.rsplit('/')[-1].split('.')[0]
+                module = __import__(module_str)
+                module.usage, module.main # This is just to insure they exist
+                
+                module_dict[path_str].append(module_str)
+            except Exception, e:
+                pass
+        
+    usage_list = []
+    usage_list.append("\nTry the following modules for more information:")
+    usage_list.append('\n'.join(["    wowspi %s --help" % module_str for module_str in module_dict['bin']]))
+    usage_list.append("\nModules that implement intermediate steps (for internal use):")
+    usage_list.append('\n'.join(["    wowspi %s --help" % module_str for module_str in module_dict['lib']]))
 
-    module_list = []
-    for py_path in sorted(glob.glob(os.path.join(wowspilib_path, '*.py'))):
-        try:
-            module_str = py_path.rsplit('/')[-1].split('.')[0]
-            module = __import__(module_str)
-            module.usage
-            module.main
-            
-            module_list.append(module_str)
-        except:
-            #raise
-            pass
-        
-    print "\nModules that implement intermediate steps (for internal use):"
-    for module_str in module_list:
-        print "    wowspi %s --help" % module_str
+    parser = optparse.OptionParser("Usage: wowspi [options] <module> [module options]" + '\n'.join(usage_list))
+    parser.disable_interspersed_args()
+    usage_setup(parser)
     
-else:
-    module = __import__(sys.argv[1])
-    options, arguments = module.usage(sys.argv[2:])
-    sys.exit(module.main(sys.argv[2:], options, arguments) or 0)
+    return parser.parse_args(sys_argv)
+
+def usage_setup(parser, **kwargs):
+    if kwargs.get('profile', True):
+        parser.add_option("--profile"
+                , help="Use cProfile to profile the application while running; save data to FILE."
+                , metavar="FILE"
+                , dest="profile_path"
+                , action="store"
+                , type="str"
+                #, default="profile.out"
+            )
+
+def main(options, arguments):
+    module = __import__(arguments[0])
+    m_options, m_arguments = module.usage(arguments[1:])
+    
+    if options.profile_path:
+        import cProfile
+        cProfile.runctx('''sys.exit(module.main(arguments[1:], m_options, m_arguments) or 0)''', globals(), locals(), options.profile_path)
+    else:
+        sys.exit(module.main(arguments[1:], m_options, m_arguments) or 0)
+    
+
+if __name__ == "__main__":
+    env_setup()
+    options, arguments = usage(sys.argv[1:])
+    sys.exit(main(options, arguments) or 0)

@@ -401,7 +401,7 @@ def main(sys_argv, options, arguments):
         conn_execute(conn, '''drop table if exists auralist''')
         conn_execute(conn, '''drop table if exists aura''')
         conn_execute(conn, '''create table aura (id integer primary key, start_event_id int, end_event_id int, start_time timestamp, end_time timestamp, sourceType str, sourceName str, destType str, destName str, spellName str, spellId int)''')
-        conn_execute(conn, '''create index ndx_aura_time on aura (start_time, end_time)''')
+        conn_execute(conn, '''create index ndx_aura_time on aura (start_time, end_time, spellName, destName)''')
         conn_execute(conn, '''create index ndx_aura_id on aura (start_event_id)''')
         conn.commit()
         

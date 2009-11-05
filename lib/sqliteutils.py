@@ -55,11 +55,11 @@ def sqlite_connection(options):
     return conn
     
 def sqlite_insureColumns(conn, table_str, column_list):
-    col_set = set(conn.execute('''select * from %s limit 1''' % table_str).fetchone().keys())
+    col_set = set(conn_execute(conn, '''select * from %s limit 1''' % table_str).fetchone().keys())
     
     for col_str, def_str in column_list:
         if col_str not in col_set:
-            conn.execute('''alter table %s add column %s %s''' % (table_str, col_str, def_str))
+            conn_execute(conn, '''alter table %s add column %s %s''' % (table_str, col_str, def_str))
 
 
 _count_dict = {}
@@ -104,10 +104,10 @@ def sqlite_print_perf(verbose=True):
 #        basicparse.sqlite_insureColumns(conn, 'combat', [('stasis_path', 'str')])
 #    
 #        print datetime.datetime.now(), "Iterating over combat images (finding stasis parses)..."
-#        for combat in conn.execute('''select * from combat order by start_event_id''').fetchall():
-#            start_dt = conn.execute('''select time from event where id = ?''', (combat['start_event_id'],)).fetchone()[0]
+#        for combat in conn_execute(conn, '''select * from combat order by start_event_id''').fetchall():
+#            start_dt = conn_execute(conn, '''select time from event where id = ?''', (combat['start_event_id'],)).fetchone()[0]
 #            
-#            conn.execute('''update combat set stasis_path = ? where id = ?''', (matchCombatToStasis(conn, combat, options.stasis_path), combat['id']))
+#            conn_execute(conn, '''update combat set stasis_path = ? where id = ?''', (matchCombatToStasis(conn, combat, options.stasis_path), combat['id']))
 #    
 #        conn.commit()
 #

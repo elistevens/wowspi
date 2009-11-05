@@ -25,6 +25,7 @@ import combatgroup
 import armoryutils
 
 import config
+from sqliteutils import *
 
 def usage(sys_argv):
     options = optparse.OptionParser("Usage: wowspi %s [options]" % __file__.rsplit('/')[-1].split('.')[0])
@@ -81,7 +82,7 @@ def usage_defaults(options):
 
 
 def matchCombatToStasis(conn, combat, stasisbase_path):
-    start_dt = conn.execute('''select time from event where id = ?''', (combat['start_event_id'],)).fetchone()[0]
+    start_dt = conn_execute(conn, '''select time from event where id = ?''', (combat['start_event_id'],)).fetchone()[0]
     
     start_seconds = time.mktime(start_dt.timetuple())
     #print start_seconds
@@ -163,10 +164,10 @@ def main(sys_argv, options, arguments):
         basicparse.sqlite_insureColumns(conn, 'combat', [('stasis_path', 'str')])
     
         print datetime.datetime.now(), "Iterating over combat images (finding stasis parses)..."
-        for combat in conn.execute('''select * from combat order by start_event_id''').fetchall():
-            start_dt = conn.execute('''select time from event where id = ?''', (combat['start_event_id'],)).fetchone()[0]
+        for combat in conn_execute(conn, '''select * from combat order by start_event_id''').fetchall():
+            start_dt = conn_execute(conn, '''select time from event where id = ?''', (combat['start_event_id'],)).fetchone()[0]
             
-            conn.execute('''update combat set stasis_path = ? where id = ?''', (matchCombatToStasis(conn, combat, options.stasis_path), combat['id']))
+            conn_execute(conn, '''update combat set stasis_path = ? where id = ?''', (matchCombatToStasis(conn, combat, options.stasis_path), combat['id']))
     
         conn.commit()
 

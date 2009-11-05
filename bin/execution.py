@@ -67,7 +67,7 @@ def getAllPresent(conn, combat):
     
     where_list.append(('''time >= ?''', start_event['time']))
     where_list.append(('''time <= ?''', end_event['time']))
-    where_list.append(('''combat = ?''', combat['id']))
+    where_list.append(('''combat_id = ?''', combat['id']))
     where_list.append(('''wipe = ?''', 0))
     
     present_dict = {}
@@ -116,6 +116,9 @@ def runAwayDebuff(conn, combat, debuffSpellId, damageSpellId, ignoredSeconds=0, 
             #print destName_str, len(damage_list)
             fail_dict[destName_str] += len(damage_list)
             
+        if application_list:
+            fail_dict[destName_str] /= len(application_list)
+            
     return fail_dict
     
 
@@ -139,7 +142,7 @@ def avoidableDamage(conn, combat, damageSpellId=0, ignoredSeconds=0, ignoredDama
             
     ignored_td = datetime.timedelta(seconds=ignoredSeconds)
     for destName_str, application_list in application_dict.items():
-        print destName_str, damageSpellId
+        #print destName_str, damageSpellId
         
         fail_dict[destName_str] = 0
         for event, damage_list in application_list:
@@ -157,7 +160,7 @@ def avoidableDamage(conn, combat, damageSpellId=0, ignoredSeconds=0, ignoredDama
 
 
 
-def chainLightning(conn, combat, damageSpellId, ignoredTargets=2):
+def chainLightning(conn, combat, damageSpellId, ignoredTargets=2, **kwargs):
     fail_dict, where_list = getAllPresent(conn, combat)
 
     fail_list = []
@@ -178,7 +181,7 @@ def chainLightning(conn, combat, damageSpellId, ignoredTargets=2):
     return fail_dict
 
 
-def clumpDebuff(conn, combat, debuffSpellId, ignoredTargets=2):
+def clumpDebuff(conn, combat, debuffSpellId, ignoredTargets=2, **kwargs):
     fail_dict, where_list = getAllPresent(conn, combat)
 
     fail_list = []
@@ -240,18 +243,21 @@ def main(sys_argv, options, arguments):
         combatgroup.main(sys_argv, options, arguments)
         conn = sqlite_connection(options)
         
-        #if options.bin_path and not glob.glob(os.path.join(options.stasis_path, 'sws-*')):
-        #    print datetime.datetime.now(), "Running stasis into: %s" % options.stasis_path
-        #    runStasis(conn, options)
-        
+        conn_execute(conn, '''drop table if exists execution''')
+        conn_execute(conn, '''create table execution (id integer primary key, date_str str, type str, instance str, encounter str, typeName str, toonName str, value float)''')
+        conn_execute(conn, '''create index ndx_execution_which on execution (toonName, type, instance, encounter, typeName)''')
+        conn_execute(conn, '''create index ndx_execution_when on execution (date_str, type, instance, encounter, typeName, toonName)''')
+
         overall_dict = {}
-        
+        date_str = None
         
         print datetime.datetime.now(), "Iterating over combats (finding execution failures)..."
         for combat in conn_execute(conn, '''select * from combat order by start_event_id''').fetchall():
+            start_dt = conn_execute(conn, '''select time from event where id = ?''', (combat['start_event_id'],)).fetchone()[0]
+            end_dt = conn_execute(conn, '''select time from event where id = ?''', (combat['end_event_id'],)).fetchone()[0]
             
-            start_dt = conn_execute(conn, '''select time from event where id = ?''', (combat['start_event_id'],))
-            end_dt = conn_execute(conn, '''select time from event where id = ?''', (combat['end_event_id'],))
+            if not date_str:
+                date_str = start_dt.strftime("%Y-%m-%d")
             
             if (end_dt - start_dt) >= datetime.timedelta(seconds=110):
                 for fail_str, args_dict in instanceData()[combat['instance']][combat['encounter']].get('execution', {}).items():
@@ -266,6 +272,9 @@ def main(sys_argv, options, arguments):
         for key in sorted(overall_dict):
             for k,v in sorted(normalize(avgDictsPerKey(overall_dict[key])).items(), key=lambda x: (-x[1], x[0])):
                 print "overall", key, k, v
+                
+                conn_execute(conn, '''insert into execution (instance, encounter, typeName, toonName, value, date_str) values (?,?,?,?,?,?)''', key + (k, v, date_str))
+        conn.commit()
     finally:
         sqlite_print_perf(options.verbose)
         pass
