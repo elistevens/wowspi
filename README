@@ -31,8 +31,8 @@ Command line arguments
 ----------------------
 
 $ ./wowspi --help
-Usage: wowspi <module> [options]
-
+ ./wowspi --help
+Usage: wowspi [options] <module> [module options]
 Try the following modules for more information:
     wowspi activitygraph --help
     wowspi execution --help
@@ -42,6 +42,11 @@ Modules that implement intermediate steps (for internal use):
     wowspi basicparse --help
     wowspi combatgroup --help
     wowspi stasisutils --help
+
+Options:
+  -h, --help      show this help message and exit
+  --profile=FILE  Use cProfile to profile the application while running; save
+                  data to FILE.
     
 $ ./wowspi activitygraph --help
 Usage: wowspi activitygraph [options]
