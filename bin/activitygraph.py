@@ -58,6 +58,8 @@ def usage_setup(op, **kwargs):
                 #, default="output"
             )
 
+def usage_defaults(options):
+    pass
     
 
 class Timeline(object):

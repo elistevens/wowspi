@@ -43,6 +43,8 @@ def usage_setup(op, **kwargs):
     #                      "Gormok the Impaler,Acidmaw,Dreadscale,Icehowl,Lord Jaraxxus,Eydis Darkbane,Fjola Lightbane,Anub'arak,Nerubian Burrower,Onyxia" +\
     #                      "Gorgrim Shadowcleave,Birana Stormhoof,Erin Misthoof,Ruj'kah,Ginselle Blightslinger,Liandra Suncaller,Malithas Brightblade,Caiphus the Stern,Vivienne Blackwhisper,Maz'dinah,Broln Stouthorn,Thrakgar,Harkzog,Narrhok Steelbreaker",
     #        )
+def usage_defaults(options):
+    pass
 
 
 class LogSegment(object):
@@ -279,13 +281,14 @@ class LogCombat(object):
                 tank_list.append((row['name'], row['overhealed']))
                     
                     
-        conn_execute(conn, '''update combat set dps_list = ?, healer_list = ?, tank_list = ? where id = ?''', (dps_list, healer_list, tank_list, self.db_id))
-        conn.commit()
-        
         # Time for wipe detection!
         healer_set = set([x[0] for x in healer_list])
         tank_set = set([x[0] for x in tank_list])
         dps_set = set([x[0] for x in dps_list])
+        
+        raidSize_int = len(healer_set) + len(tank_set) + len(dps_set)
+        conn_execute(conn, '''update combat set size = ?, dps_list = ?, healer_list = ?, tank_list = ? where id = ?''', (raidSize_int, dps_list, healer_list, tank_list, self.db_id))
+        conn.commit()
         
         healersDead_set = set()
         tanksDead_set = set()
@@ -329,7 +332,6 @@ class LogCombat(object):
             conn_execute(conn, sql_str, values_tup)
         conn.commit()
         
-        raidSize_int = len(healer_set) + len(tank_set) + len(dps_set)
         dead_int = len(healersDead_set) + len(tanksDead_set) + len(dpsDead_set)
         
         # Do we need to bother?  If half of the raid is alive at the end, no.
@@ -390,7 +392,7 @@ def main(sys_argv, options, arguments):
         conn_execute(conn, '''create index ndx_event_combat_time on event (combat_id, time)''')
         
         conn_execute(conn, '''drop table if exists combat''')
-        conn_execute(conn, '''create table combat (id integer primary key, start_event_id, close_event_id, end_event_id, instance, encounter, dps_list json, healer_list json, tank_list json)''')
+        conn_execute(conn, '''create table combat (id integer primary key, start_event_id, close_event_id, end_event_id, size int, instance, encounter, dps_list json, healer_list json, tank_list json)''')
     
         conn_execute(conn, '''drop table if exists segment''')
         conn_execute(conn, '''create table segment (id integer primary key, start_event_id, close_event_id, end_event_id, combat_id)''')

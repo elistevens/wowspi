@@ -85,7 +85,16 @@
         },
         "Razorscale": {
             "boss": ["Razorscale"],
-            "mobs": ["Dark Rune Sentinel", "Dark Rune Watcher", "Dark Rune Guardian"]
+            "mobs": ["Dark Rune Sentinel", "Dark Rune Watcher", "Dark Rune Guardian"],
+            "execution": {
+                "Devouring Flame": {
+                    "type": "avoidableDamage",
+                    "damageSpellId": 64704,
+                    "ignoredSeconds": 0,
+                    "ignoredDamage": 0
+                }
+            }
+            
         },
         "XT-002 Deconstructor": {
             "boss": ["XT-002 Deconstructor"],
@@ -166,14 +175,14 @@
             "execution": {
                 "Fire Bomb": {
                     "type": "avoidableDamage",
-                    "damageSpellId": 66320,
+                    "damageSpellId": [66320, 67472],
                     "ignoredSeconds": 0,
                     "ignoredDamage": 0
                 },
                 "Paralytic Toxin": {
                     "type": "clumpDebuff",
-                    "ignoredTargets": 1,
-                    "debuffSpellId": 66823
+                    "debuffSpellId": [66823, 67618],
+                    "ignoredTargets": 1
                 },
                 "Slime Pool": {
                     "type": "avoidableDamage",

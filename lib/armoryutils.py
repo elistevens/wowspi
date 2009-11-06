@@ -57,6 +57,9 @@ def usage_setup(op, **kwargs):
                 , default="www"
             )
 
+def usage_defaults(options):
+    pass
+
 
 
 armoryField_list = ['name', 'class', 'level', 'guildName', 'faction', 'gender', 'race']

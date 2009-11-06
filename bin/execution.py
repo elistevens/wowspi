@@ -57,6 +57,8 @@ def usage_setup(op, **kwargs):
                 , action="store_true"
             )
 
+def usage_defaults(options):
+    pass
 
     
 def getAllPresent(conn, combat):
@@ -202,39 +204,39 @@ def clumpDebuff(conn, combat, debuffSpellId, ignoredTargets=2, **kwargs):
     return fail_dict
 
 
-def normalize(fail_dict):
-    normalized_dict = {}
-    
-    if fail_dict:
-        max_value = float(max(fail_dict.values()))
-        for k,v in fail_dict.items():
-            if max_value:
-                normalized_dict[k] = v / max_value
-            else:
-                normalized_dict[k] = 0
-        
-    return normalized_dict
-
-
-
-def avgDictsPerKey(dict_list):
-    key_set = set()
-    sum_dict = {}
-    count_dict = {}
-    
-    for d in dict_list:
-        for k in d.keys():
-            key_set.add(k)
-            sum_dict.setdefault(k, 0)
-            sum_dict[k] += d[k]
-    
-            count_dict.setdefault(k, 0)
-            count_dict[k] += 1
-            
-    for k in sum_dict:
-        sum_dict[k] /= float(count_dict[k])
-        
-    return sum_dict
+#def normalize(fail_dict):
+#    normalized_dict = {}
+#    
+#    if fail_dict:
+#        max_value = float(max(fail_dict.values()))
+#        for k,v in fail_dict.items():
+#            if max_value:
+#                normalized_dict[k] = v / max_value
+#            else:
+#                normalized_dict[k] = 0
+#        
+#    return normalized_dict
+#
+#
+#
+#def avgDictsPerKey(dict_list):
+#    key_set = set()
+#    sum_dict = {}
+#    count_dict = {}
+#    
+#    for d in dict_list:
+#        for k in d.keys():
+#            key_set.add(k)
+#            sum_dict.setdefault(k, 0)
+#            sum_dict[k] += d[k]
+#    
+#            count_dict.setdefault(k, 0)
+#            count_dict[k] += 1
+#            
+#    for k in sum_dict:
+#        sum_dict[k] /= float(count_dict[k])
+#        
+#    return sum_dict
     
 
 
@@ -244,9 +246,9 @@ def main(sys_argv, options, arguments):
         conn = sqlite_connection(options)
         
         conn_execute(conn, '''drop table if exists execution''')
-        conn_execute(conn, '''create table execution (id integer primary key, date_str str, type str, instance str, encounter str, typeName str, toonName str, value float)''')
-        conn_execute(conn, '''create index ndx_execution_which on execution (toonName, type, instance, encounter, typeName)''')
-        conn_execute(conn, '''create index ndx_execution_when on execution (date_str, type, instance, encounter, typeName, toonName)''')
+        conn_execute(conn, '''create table execution (id integer primary key, date_str str, type str, combat_id int, typeName str, toonName str, value float default 0.0, normalizedValue float default 0.0)''')
+        conn_execute(conn, '''create index ndx_execution_which on execution (toonName, type, combat_id, typeName)''')
+        conn_execute(conn, '''create index ndx_execution_when on execution (date_str, type, combat_id, typeName, toonName)''')
 
         overall_dict = {}
         date_str = None
@@ -263,17 +265,25 @@ def main(sys_argv, options, arguments):
                 for fail_str, args_dict in instanceData()[combat['instance']][combat['encounter']].get('execution', {}).items():
                     fail_dict = globals().get(args_dict['type'])(conn, combat, **dict([(str(k), v) for k,v in args_dict.items()]))
                     
-                    #for k,v in sorted(fail_dict.items(), key=lambda x: (-x[1], x[0])):
-                    #    print combat['id'], combat['encounter'], fail_str, k, v
-                        
-                    overall_dict.setdefault((combat['instance'], combat['encounter'], fail_str), [])
-                    overall_dict[(combat['instance'], combat['encounter'], fail_str)].append(fail_dict)
-                
-        for key in sorted(overall_dict):
-            for k,v in sorted(normalize(avgDictsPerKey(overall_dict[key])).items(), key=lambda x: (-x[1], x[0])):
-                print "overall", key, k, v
-                
-                conn_execute(conn, '''insert into execution (instance, encounter, typeName, toonName, value, date_str) values (?,?,?,?,?,?)''', key + (k, v, date_str))
+                    for toonName, value in sorted(fail_dict.items(), key=lambda x: (-x[1], x[0])):
+                        conn_execute(conn, '''insert into execution (date_str, type, combat_id, typeName, toonName, value) values (?,?,?,?,?,?)''',
+                                (date_str, 'fail', combat['id'], fail_str, toonName, value))
+
+        for row in conn_execute(conn, '''select typeName, max(value) maxValue from execution where type = ? group by typeName''', ('fail',)).fetchall():
+            if row['maxValue'] > 0.0:
+                conn_execute(conn, '''update execution set normalizedValue = value / ? where type = ? and typeName = ?''', (row['maxValue'], 'fail', row['typeName']))
+
+        #            #for k,v in sorted(fail_dict.items(), key=lambda x: (-x[1], x[0])):
+        #            #    print combat['id'], combat['encounter'], fail_str, k, v
+        #                
+        #            overall_dict.setdefault((combat['instance'], combat['encounter'], fail_str), [])
+        #            overall_dict[(combat['instance'], combat['encounter'], fail_str)].append(fail_dict)
+        #        
+        #for key in sorted(overall_dict):
+        #    for k,v in sorted(normalize(avgDictsPerKey(overall_dict[key])).items(), key=lambda x: (-x[1], x[0])):
+        #        print "overall", key, k, v
+        #        
+        #        conn_execute(conn, '''insert into execution (instance, encounter, typeName, toonName, value, date_str) values (?,?,?,?,?,?)''', key + (k, v, date_str))
         conn.commit()
     finally:
         sqlite_print_perf(options.verbose)
