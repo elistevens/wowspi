@@ -111,7 +111,7 @@ def addImage(conn, combat, file_path, tab_str):
     file_str = file_path.rsplit('/', 1)[-1]
     
     div_str = '''<div class="tab" id="tab_%s">''' % tab_str
-    comment_str = '''<!-- wowspi start -->%s<!-- wowspi end -->'''
+    comment_str = '''\n<!-- wowspi start -->\n%s\n<!-- wowspi end -->\n'''
     img_str = '''<br/><br/><br/><img src="%s" /><br /><br />''' % file_str
 
     index_str = file(os.path.join(combat['stasis_path'], 'index.html')).read()
@@ -121,7 +121,7 @@ def addImage(conn, combat, file_path, tab_str):
 
 def removeImages(conn, combat):
     index_str = file(os.path.join(combat['stasis_path'], 'index.html')).read()
-    index_str = re.sub('''<!-- wowspi start -->.*?<!-- wowspi end -->''', '', index_str)
+    index_str = re.sub('''\n?<!-- wowspi start -->.*?<!-- wowspi end -->\n?''', '', index_str)
     file(os.path.join(combat['stasis_path'], 'index.html'), 'w').write(index_str)
     
 def runStasis(conn, options):
@@ -146,9 +146,9 @@ def runStasis(conn, options):
 
 .swsmaster div.tabContainer div.tabBar, .swsmaster div.tabContainer div.tab table {'''
 
-    css_str = css_str.replace('''.swsmaster div.tabContainer {''', new_str)
-    
-    file(os.path.join(options.stasis_path, 'extras', 'ses2.css'), 'w').write(css_str)
+    if new_str not in css_str:
+        css_str = css_str.replace('''.swsmaster div.tabContainer {''', new_str)
+        file(os.path.join(options.stasis_path, 'extras', 'sws2.css'), 'w').write(css_str)
     subprocess.call(['rm', '-rf', os.path.join(options.stasis_path, 'extras', '.svn')])
 
 
