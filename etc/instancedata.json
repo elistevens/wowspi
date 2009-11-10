@@ -81,7 +81,14 @@
         },
         "Ignis the Furnace Master": {
             "boss": ["Ignis the Furnace Master"],
-            "mobs": []
+            "mobs": [],
+            "execution": {
+                "Flame Jets": {
+                    "type": "avoidableAttack",
+                    "attackSpellId": 62681,
+                    "eventType": "SPELL_INTERRUPT"
+                }
+            }
         },
         "Razorscale": {
             "boss": ["Razorscale"],
@@ -98,15 +105,51 @@
         },
         "XT-002 Deconstructor": {
             "boss": ["XT-002 Deconstructor"],
-            "mobs": ["Heart of the Deconstructor"]
+            "mobs": ["Heart of the Deconstructor"],
+            "execution": {
+                "Searing Light": {
+                    "type": "runAwayDebuff",
+                    "debuffSpellId": [63018, 65121],
+                    "damageSpellId": [63023, 65120],
+                    "ignoredSeconds": 1
+                },
+                "Gravity Bomb": {
+                    "type": "runAwayDebuff",
+                    "debuffSpellId": [63024, 64234],
+                    "damageSpellId": [63025, 64233],
+                    "ignoredSeconds": 0
+                }
+            }
         },
         "Assembly of Iron": {
             "boss": ["Steelbreaker", "Runemaster Molgeim", "Stormcaller Brundir"],
-            "mobs": []
+            "mobs": [],
+            "execution": {
+                "Overload": {
+                    "type": "avoidableAttack",
+                    "attackSpellId": 61878,
+                    "eventType": "SPELL_DAMAGE"
+                },
+                "Rune of Death": {
+                    "type": "avoidableDamage",
+                    "damageSpellId": [63490, 63490],
+                    "ignoredSeconds": 3,
+                    "ignoredDamage": 0
+                }
+            },
+            "stasis": "ironcouncil"
         },
         "Kologarn": {
             "boss": ["Kologarn"],
-            "mobs": []
+            "mobs": [],
+            "execution": {
+                "Focused Eyebeam": {
+                    "type": "avoidableDamage",
+                    "damageSpellId": [63346, 63976],
+                    "ignoredSeconds": 0,
+                    "ignoredDamage": 0
+                }
+            }
         },
         "Auriya": {
             "boss": ["Auriya"],
@@ -114,19 +157,96 @@
         },
         "Mimiron": {
             "boss": ["Leviathan Mk II", "VX-001", "Aerial Command Unit"],
-            "mobs": ["Assault Bot", "Junk Bot"]
+            "mobs": ["Assault Bot", "Junk Bot"],
+            "execution": {
+                "Napalm Shell": {
+                    "type": "chainLightning",
+                    "damageSpellId": [63666, 65026],
+                    "ignoredTargets": 1
+                },
+                "Laser Barrage": {
+                    "type": "avoidableAttack",
+                    "attackSpellId": 63293,
+                    "eventType": "SPELL_DAMAGE"
+                },
+                "Rocket Strike": {
+                    "type": "avoidableAttack",
+                    "attackSpellId": 63041,
+                    "eventType": "SPELL_DAMAGE"
+                },
+                "Shock Blast": {
+                    "type": "avoidableAttack",
+                    "attackSpellId": 63631,
+                    "eventType": "SPELL_DAMAGE"
+                }
+            }
         },
         "Freya": {
             "boss": ["Freya"],
-            "mobs": []
+            "mobs": [],
+            "execution": {
+                "Nature's Fury": {
+                    "type": "runAwayDebuff",
+                    "debuffSpellId": [62589, 63571],
+                    "damageSpellId": [62590, 63570],
+                    "ignoredSeconds": 1
+                },
+                "Nature Bomb": {
+                    "type": "avoidableDamage",
+                    "damageSpellId": [64587, 64650],
+                    "ignoredSeconds": 0,
+                    "ignoredDamage": 0
+                },
+                "Unstable Energy": {
+                    "type": "avoidableDamage",
+                    "damageSpellId": [62217, 62922],
+                    "ignoredSeconds": 1,
+                    "ignoredDamage": 0
+                },
+                "Ground Tremor": {
+                    "type": "avoidableAttack",
+                    "attackSpellId": [62325, 62932],
+                    "eventType": "SPELL_INTERRUPT"
+                }
+            }
         },
         "Thorim": {
             "boss": ["Thorim", "Runic Colossus", "Ancient Rune Giant"],
-            "mobs": ["Dark Rune Champion", "Dark Rune Evoker", "Dark Rune Warbringer", "Dark Rune Commoner", "Iron Ring Guard", "Iron Honor Guard"]
+            "mobs": ["Dark Rune Champion", "Dark Rune Evoker", "Dark Rune Warbringer", "Dark Rune Commoner", "Iron Ring Guard", "Iron Honor Guard"],
+            "execution": {
+                "Chain Lightning": {
+                    "type": "chainLightning",
+                    "damageSpellId": [62131, 64390],
+                    "ignoredTargets": 2
+                },
+                "Lightning Charge": {
+                    "type": "avoidableAttack",
+                    "attackSpellId": [62279, 62466],
+                    "eventType": "SPELL_DAMAGE"
+                }
+            }
         },
         "Hodir": {
             "boss": ["Hodir"],
-            "mobs": []
+            "mobs": [],
+            "execution": {
+                "Ice Shards": {
+                    "type": "avoidableAttack",
+                    "attackSpellId": [62457, 65370],
+                    "eventType": "SPELL_DAMAGE"
+                },
+                "Flash Freeze": {
+                    "type": "avoidableAttack",
+                    "attackSpellId": 61969,
+                    "eventType": "SPELL_AURA_APPLIED"
+                },
+                "Biting Cold": {
+                    "type": "avoidableDamage",
+                    "damageSpellId": 62188,
+                    "ignoredSeconds": 0,
+                    "ignoredDamage": 500
+                }
+            }
         },
         "General Vezax": {
             "boss": ["General Vezax"],
@@ -139,10 +259,9 @@
                     "ignoredSeconds": 4
                 },
                 "Shadow Crash": {
-                    "type": "avoidableDamage",
-                    "damageSpellId": 62659,
-                    "ignoredSeconds": 0,
-                    "ignoredDamage": 0
+                    "type": "avoidableAttack",
+                    "attackSpellId": 62659,
+                    "eventType": "SPELL_DAMAGE"
                 }
             },
             "stasis": "vezax"
@@ -152,20 +271,40 @@
             "mobs": ["Corruptor Tentacle", "Constrictor Tentacle", "Immortal Guardian"],
             "execution": {
                 "Death Ray": {
-                    "type": "avoidableDamage",
-                    "damageSpellId": 63884
+                    "type": "avoidableAttack",
+                    "attackSpellId": 63884,
+                    "eventType": "SPELL_DAMAGE"
                 },
                 "Lunatic Gaze": {
                     "type": "avoidableDamage",
                     "damageSpellId": 64164,
                     "ignoredSeconds": 0,
                     "ignoredDamage": 0
+                },
+                "Deafening Roar": {
+                    "type": "avoidableAttack",
+                    "attackSpellId": [64189],
+                    "eventType": "SPELL_INTERRUPT"
                 }
             }
         },
         "Algalon": {
             "boss": ["Algalon the Observer"],
-            "mobs": []
+            "mobs": [],
+            "execution": {
+                "Big Bang": {
+                    "type": "avoidableAttack",
+                    "attackSpellId": 64443,
+                    "eventType": "SPELL_DAMAGE",
+                    "requireOverkill": 1
+                },
+                "Cosmic Smash": {
+                    "type": "avoidableDamage",
+                    "damageSpellId": 62311,
+                    "ignoredSeconds": 0,
+                    "ignoredDamage": 5000
+                }
+            }
         }
     },
     "Trial of the Crusader": {
@@ -191,11 +330,9 @@
                     "ignoredDamage": 0
                 },
                 "Trample": {
-                    "type": "avoidableDamage",
-                    "damageSpellId": 66734,
-                    "binary": 1,
-                    "ignoredSeconds": 0,
-                    "ignoredDamage": 0
+                    "type": "avoidableAttack",
+                    "attackSpellId": 66734,
+                    "eventType": "SPELL_DAMAGE"
                 }
             }
         },
@@ -210,11 +347,6 @@
                 }
             }
         },
-        "Twin Val'kyr": {
-            "boss": ["Eydis Darkbane","Fjola Lightbane"],
-            "mobs": [],
-            "stasis": "twinvalkyrs"
-        },
         "Faction Champions": {
             "boss": ["Gorgrim Shadowcleave","Birana Stormhoof","Erin Misthoof","Ruj'kah","Ginselle Blightslinger","Liandra Suncaller",
                         "Malithas Brightblade","Caiphus the Stern","Vivienne Blackwhisper","Maz'dinah","Broln Stouthorn","Thrakgar",
@@ -224,6 +356,19 @@
                         "Saamul","Serissa Grimdabbler","Shocuul"
                     ],
             "mobs": []
+        },
+        "Twin Val'kyr": {
+            "boss": ["Eydis Darkbane","Fjola Lightbane"],
+            "mobs": [],
+            "execution": {
+                "Vortex": {
+                    "type": "avoidableDamage",
+                    "damageSpellId": [67155, 67203],
+                    "ignoredSeconds": 0,
+                    "ignoredDamage": 0
+                }
+            },
+            "stasis": "twinvalkyrs"
         },
         "Anub'arak": {
             "boss": ["Anub'arak"],
@@ -236,11 +381,9 @@
             "mobs": ["Onyxian Lair Guard", "Onyxian Whelp"],
             "execution": {
                 "Tail Sweep": {
-                    "type": "avoidableDamage",
-                    "damageSpellId": [ 68867, 69286 ],
-                    "binary": 1,
-                    "ignoredSeconds": 0,
-                    "ignoredDamge": 0
+                    "type": "avoidableAttack",
+                    "attackSpellId": [ 68867, 69286 ],
+                    "eventType": "SPELL_DAMAGE"
                 }
             }
         }

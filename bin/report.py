@@ -79,8 +79,12 @@ def report(conn, options):
     
     toon_set = set()
     for row in conn_execute(conn, '''select * from combat join execution on (combat.id = execution.combat_id) order by instance, encounter, typeName, value desc'''):
-        print '\t'.join([pretty(row[x]) for x in header_list])
-        toon_set.add(row['toonName'])
+        try:
+            print '\t'.join([pretty(row[x]) for x in header_list])
+            toon_set.add(row['toonName'])
+        except IndexError, e:
+            print 'Error:', e, x
+            raise
 
     final_list = []
     for toonName in toon_set:

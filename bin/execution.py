@@ -160,6 +160,20 @@ def avoidableDamage(conn, combat, damageSpellId=0, ignoredSeconds=0, ignoredDama
             
     return fail_dict
 
+def avoidableAttack(conn, combat, attackSpellId=0, eventType='SPELL_DAMAGE', requireOverkill=False, **kwargs):
+    fail_dict, where_list = getAllPresent(conn, combat)
+    
+    if requireOverkill:
+        where_list.append(('extra > ?', 0))
+
+    application_dict = {}
+    
+    current = None
+    for event in basicparse.getEventData(conn, '*', where_list, 'time', eventType=eventType, spellId=attackSpellId, destType='PC'):
+        fail_dict.setdefault(event['destName'], 0)
+        fail_dict[event['destName']] += 1
+            
+    return fail_dict
 
 
 def chainLightning(conn, combat, damageSpellId, ignoredTargets=2, **kwargs):
