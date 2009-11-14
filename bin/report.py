@@ -8,6 +8,7 @@ import datetime
 import glob
 import itertools
 import json
+import math
 import optparse
 import os
 import random
@@ -24,13 +25,14 @@ import basicparse
 import combatgroup
 import execution
 import armoryutils
+import stasisutils
 from config import css, load_css, instanceData
 
 from sqliteutils import *
 
 def usage(sys_argv):
     parser = optparse.OptionParser("Usage: wowspi %s [options]" % __file__.rsplit('/')[-1].split('.')[0])
-    module_list = ['basicparse', 'combatgroup', 'execution']
+    module_list = ['basicparse', 'combatgroup', 'stasisutils', 'execution']
 
     usage_setup(parser)
     for module in module_list:
@@ -73,14 +75,18 @@ def pretty(x):
     return str(x)
     
 def report(conn, options):
+    print options
+    
+    details_file = file(os.path.join(options.stasis_path, 'execution_details.tsv'), 'w')
+    
     needsHeader = True
     header_list = ['combat_id','date_str','size','type','instance','encounter','typeName','normalizedValue','toonName','value']
-    print '\t'.join([str(x) for x in header_list])
+    print >>details_file, '\t'.join([str(x) for x in header_list])
     
     toon_set = set()
     for row in conn_execute(conn, '''select * from combat join execution on (combat.id = execution.combat_id) order by instance, encounter, typeName, value desc'''):
         try:
-            print '\t'.join([pretty(row[x]) for x in header_list])
+            print >>details_file, '\t'.join([pretty(row[x]) for x in header_list])
             toon_set.add(row['toonName'])
         except IndexError, e:
             print 'Error:', e, x
@@ -89,7 +95,7 @@ def report(conn, options):
     final_list = []
     for toonName in toon_set:
         fail_count = conn_execute(conn, '''select count(*) from execution where type = ? and toonName = ?''', ('fail', toonName)).fetchone()[0]
-        final_count = int(fail_count * 0.5)
+        final_count = int(math.ceil(fail_count * 0.5))
         
         value_avg = 0
         if final_count > 0:
@@ -97,14 +103,16 @@ def report(conn, options):
             
         final_list.append((value_avg, toonName))
 
-    print '\t'.join(['toonName', 'avgValue'])
+    
+    overall_file = file(os.path.join(options.stasis_path, 'execution_overall.tsv'), 'w')
+    print >>overall_file, '\t'.join(['toonName', 'avgValue'])
     for t in sorted(final_list):
-        print '\t'.join([pretty(x) for x in t])
+        print >>overall_file, '\t'.join([pretty(x) for x in t])
 
 
 def main(sys_argv, options, arguments):
     try:
-        #execution.main(sys_argv, options, arguments)
+        execution.main(sys_argv, options, arguments)
         conn = sqlite_connection(options)
         
         report(conn, options)

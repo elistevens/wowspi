@@ -56,7 +56,8 @@ wowspi_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
 _instance_dict = json.load(file(os.path.join(wowspi_path, 'etc', 'instancedata.json')))
 def instanceData():
-    return copy.deepcopy(_instance_dict)
+    return _instance_dict
+    #return copy.deepcopy(_instance_dict)
 
 
 _css_dict = {}

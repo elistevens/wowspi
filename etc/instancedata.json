@@ -88,7 +88,8 @@
                     "attackSpellId": 62681,
                     "eventType": "SPELL_INTERRUPT"
                 }
-            }
+            },
+            "stasis": "ignis"
         },
         "Razorscale": {
             "boss": ["Razorscale"],
@@ -119,7 +120,8 @@
                     "damageSpellId": [63025, 64233],
                     "ignoredSeconds": 0
                 }
-            }
+            },
+            "stasis": "xt002"
         },
         "Assembly of Iron": {
             "boss": ["Steelbreaker", "Runemaster Molgeim", "Stormcaller Brundir"],

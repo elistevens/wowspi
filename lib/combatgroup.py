@@ -390,6 +390,7 @@ def main(sys_argv, options, arguments):
         conn_execute(conn, '''drop index if exists ndx_event_combat_time''')
         conn_execute(conn, '''update event set segment_id = ?, combat_id = ?, wound_dict = ?, active_dict = ?''', (0, 0, {}, {}))
         conn_execute(conn, '''create index ndx_event_combat_time on event (combat_id, time)''')
+        conn_execute(conn, '''create index ndx_event_combat_source_time on event (combat_id, sourceType, sourceName, time)''')
         
         conn_execute(conn, '''drop table if exists combat''')
         conn_execute(conn, '''create table combat (id integer primary key, start_event_id, close_event_id, end_event_id, size int, instance, encounter, dps_list json, healer_list json, tank_list json)''')
@@ -404,6 +405,8 @@ def main(sys_argv, options, arguments):
         conn_execute(conn, '''drop table if exists aura''')
         conn_execute(conn, '''create table aura (id integer primary key, start_event_id int, end_event_id int, start_time timestamp, end_time timestamp, sourceType str, sourceName str, destType str, destName str, spellName str, spellId int)''')
         conn_execute(conn, '''create index ndx_aura_time on aura (start_time, end_time, spellName, destName)''')
+        conn_execute(conn, '''create index ndx_aura_name_time on aura (spellName, start_time, end_time, destName)''')
+        conn_execute(conn, '''create index ndx_aura_dest on aura (destType, destName, spellName, start_time, end_time)''')
         conn_execute(conn, '''create index ndx_aura_id on aura (start_event_id)''')
         conn.commit()
         

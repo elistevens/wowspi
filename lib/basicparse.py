@@ -338,7 +338,9 @@ def parseLog(conn, log_path, force=False):
     #print ('''create table event (id integer primary key, path, %s, fragment_id int, combat_id int, wound_dict json, active_dict json)''' % col_str).replace('time,', 'time timestamp,',)
     
     conn_execute(conn, ('''create table event (id integer primary key, path, %s)''' % col_str).replace('time,', 'time timestamp,',))
-    conn_execute(conn, '''create index ndx_event_time_sourceName on event (time, sourceName)''')
+    conn_execute(conn, '''create index ndx_event_time on event (time)''')
+    conn_execute(conn, '''create index ndx_event_time_sourceName on event (sourceName, suffix, time)''')
+    conn_execute(conn, '''create index ndx_event_source_dest_type on event (sourceType, destType, suffix, time, sourceName, destName)''')
 
     # FIXME: 'file' should be some flavor of 'codecs.open' for int'l regions
     for row in csv.reader(file(log_path)):
@@ -394,12 +396,16 @@ def getEventData(conn, select_str='*', where_list=None, orderBy=None, **kwargs):
             arg_list.append(tup[1])
         
     for k, v in sorted(kwargs.items()):
-        if isinstance(v, tuple):
-            sql_list.append('''%s in (%s)''' % (k, ','.join(['?' for x in v])))
-            arg_list.extend(v)
-        elif isinstance(v, list):
-            sql_list.append('''%s in (%s)''' % (k, ','.join(['?' for x in v])))
-            arg_list.extend(tuple(v))
+        if isinstance(v, tuple) or isinstance(v, list):
+            if len(v) > 1:
+                sql_list.append('''%s in (%s)''' % (k, ','.join(['?' for x in v])))
+                arg_list.extend(tuple(v))
+            else:
+                sql_list.append('''%s = ?''' % k)
+                arg_list.append(v[0])
+        #elif isinstance(v, list):
+        #    sql_list.append('''%s in (%s)''' % (k, ','.join(['?' for x in v])))
+        #    arg_list.extend(tuple(v))
         else:
             sql_list.append('''%s = ?''' % k)
             arg_list.append(v)
