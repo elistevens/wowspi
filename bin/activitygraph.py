@@ -50,54 +50,54 @@ from sqliteutils import *
 #version = None
 #htmlContent1 = """..."""
 #htmlContent2 = """..."""
-
-def usage(sys_argv):
-    #op = optparse.OptionParser("Usage: wowspi %s [options]" % __file__.rsplit('/')[-1].split('.')[0])
-    #usage_setup(op)
-    #basicparse.usage_setup(op)
-    #combatgroup.usage_setup(op)
-    #armoryutils.usage_setup(op)
-    #stasisutils.usage_setup(op)
-    #
-    #options, arguments = op.parse_args(sys_argv)
-    #
-    #basicparse.usage_defaults(options)
-    #stasisutils.usage_defaults(options)
-    #
-    #return options, arguments
-
-
-    parser = optparse.OptionParser("Usage: wowspi %s [options]" % __file__.rsplit('/')[-1].split('.')[0])
-    module_list = ['basicparse', 'combatgroup', 'armoryutils', 'stasisutils']
-
-    usage_setup(parser)
-    for module in module_list:
-        globals()[module].usage_setup(parser)
-    
-    options, arguments = parser.parse_args(sys_argv)
-    
-    for module in module_list:
-        globals()[module].usage_defaults(options)
-    usage_defaults(options)
-
-    return options, arguments
-
-
-
-def usage_setup(op, **kwargs):
-    if kwargs.get('css', True):
-        op.add_option("--css"
-                , help="Use color settings from etc/css.NAME.json to render images."
-                , metavar="NAME"
-                , dest="css_str"
-                , action="store"
-                , type="str"
-                #, default="output"
-            )
-
-def usage_defaults(options):
-    pass
-    
+#
+#def usage(sys_argv):
+#    #op = optparse.OptionParser("Usage: wowspi %s [options]" % __file__.rsplit('/')[-1].split('.')[0])
+#    #usage_setup(op)
+#    #basicparse.usage_setup(op)
+#    #combatgroup.usage_setup(op)
+#    #armoryutils.usage_setup(op)
+#    #stasisutils.usage_setup(op)
+#    #
+#    #options, arguments = op.parse_args(sys_argv)
+#    #
+#    #basicparse.usage_defaults(options)
+#    #stasisutils.usage_defaults(options)
+#    #
+#    #return options, arguments
+#
+#
+#    parser = optparse.OptionParser("Usage: wowspi %s [options]" % __file__.rsplit('/')[-1].split('.')[0])
+#    module_list = ['basicparse', 'combatgroup', 'armoryutils', 'stasisutils']
+#
+#    usage_setup(parser)
+#    for module in module_list:
+#        globals()[module].usage_setup(parser)
+#    
+#    options, arguments = parser.parse_args(sys_argv)
+#    
+#    for module in module_list:
+#        globals()[module].usage_defaults(options)
+#    usage_defaults(options)
+#
+#    return options, arguments
+#
+#
+#
+#def usage_setup(op, **kwargs):
+#    if kwargs.get('css', True):
+#        op.add_option("--css"
+#                , help="Use color settings from etc/css.NAME.json to render images."
+#                , metavar="NAME"
+#                , dest="css_str"
+#                , action="store"
+#                , type="str"
+#                #, default="output"
+#            )
+#
+#def usage_defaults(options):
+#    pass
+#    
 
 class Timeline(object):
     def __init__(self, conn, start_dt, end_dt, width=0.2):
@@ -619,6 +619,18 @@ class GraphRun(DataRun):
                     region.render(draw)
                 
                 image.save(file_path)
+                
+    def usage_setup(self, parser, **kwargs):
+        if kwargs.get('css', True):
+            parser.add_option("--css"
+                    , help="Use color settings from etc/css.NAME.json to render images."
+                    , metavar="NAME"
+                    , dest="css_str"
+                    , action="store"
+                    , type="str"
+                    #, default="output"
+                )
+                
 GraphRun() # This sets up the dict of runners so that we don't have to call them in __init__
 
 

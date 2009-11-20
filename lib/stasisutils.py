@@ -241,9 +241,9 @@ class CombatStasisMatchRun(DataRun):
         
     def impl(self, options):
         print datetime.datetime.now(), "Iterating over combat images (finding stasis parses)..."
-        basicparse.sqlite_insureColumns(conn, 'combat', [('stasis_path', 'str')])
-        for combat in conn_execute(conn, '''select * from combat order by start_event_id''').fetchall():
-            start_dt = conn_execute(conn, '''select time from event where id = ?''', (combat['start_event_id'],)).fetchone()[0]
+        basicparse.sqlite_insureColumns(self.conn, 'combat', [('stasis_path', 'str')])
+        for combat in conn_execute(self.conn, '''select * from combat order by start_event_id''').fetchall():
+            start_dt = conn_execute(self.conn, '''select time from event where id = ?''', (combat['start_event_id'],)).fetchone()[0]
             
             start_seconds = time.mktime(start_dt.timetuple())
             #print start_seconds
@@ -251,14 +251,14 @@ class CombatStasisMatchRun(DataRun):
             stasis_str = armoryutils.getStasisName(combat['instance'], combat['encounter'])
             
             min_float = 1000.0
-            for stasis_path in glob.glob(os.path.join(stasisbase_path, 'sws-%s-*' % stasis_str)):
+            for stasis_path in glob.glob(os.path.join(options.stasis_path, 'sws-%s-*' % stasis_str)):
                 try:
                     stasis_seconds = int(stasis_path.rsplit('-', 1)[-1])
                     diff_float = stasis_seconds - start_seconds
                     
                     if diff_float < 60 and diff_float > -10:
                         # Match found!
-                        conn_execute(conn, '''update combat set stasis_path = ? where id = ?''', (stasis_path, combat['id']))
+                        conn_execute(self.conn, '''update combat set stasis_path = ? where id = ?''', (stasis_path, combat['id']))
                         break
                     
                     if abs(diff_float) < abs(min_float):
@@ -266,9 +266,9 @@ class CombatStasisMatchRun(DataRun):
                 except:
                     pass
             else:
-                print datetime.datetime.now(), "No min diff found:", min_float, stasis_str, start_seconds, glob.glob(os.path.join(stasisbase_path, 'sws-%s-*' % stasis_str))
+                print datetime.datetime.now(), "No min diff found:", min_float, stasis_str, start_seconds, glob.glob(os.path.join(options.stasis_path, 'sws-%s-*' % stasis_str))
     
-        conn.commit()
+        self.conn.commit()
 CombatStasisMatchRun() # This sets up the dict of runners so that we don't have to call them in __init__
 
 
