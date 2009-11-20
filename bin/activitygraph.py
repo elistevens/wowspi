@@ -1,5 +1,25 @@
 #!/usr/bin/env python
 
+#Copyright (c) 2009, Eli Stevens
+#
+#Permission is hereby granted, free of charge, to any person obtaining a copy
+#of this software and associated documentation files (the "Software"), to deal
+#in the Software without restriction, including without limitation the rights
+#to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+#copies of the Software, and to permit persons to whom the Software is
+#furnished to do so, subject to the following conditions:
+#
+#The above copyright notice and this permission notice shall be included in
+#all copies or substantial portions of the Software.
+#
+#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+#IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+#FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+#AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+#LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+#OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+#THE SOFTWARE.
+
 import cgi
 import collections
 import copy
@@ -32,19 +52,36 @@ from sqliteutils import *
 #htmlContent2 = """..."""
 
 def usage(sys_argv):
-    op = optparse.OptionParser("Usage: wowspi %s [options]" % __file__.rsplit('/')[-1].split('.')[0])
-    usage_setup(op)
-    basicparse.usage_setup(op)
-    combatgroup.usage_setup(op)
-    armoryutils.usage_setup(op)
-    stasisutils.usage_setup(op)
+    #op = optparse.OptionParser("Usage: wowspi %s [options]" % __file__.rsplit('/')[-1].split('.')[0])
+    #usage_setup(op)
+    #basicparse.usage_setup(op)
+    #combatgroup.usage_setup(op)
+    #armoryutils.usage_setup(op)
+    #stasisutils.usage_setup(op)
+    #
+    #options, arguments = op.parse_args(sys_argv)
+    #
+    #basicparse.usage_defaults(options)
+    #stasisutils.usage_defaults(options)
+    #
+    #return options, arguments
+
+
+    parser = optparse.OptionParser("Usage: wowspi %s [options]" % __file__.rsplit('/')[-1].split('.')[0])
+    module_list = ['basicparse', 'combatgroup', 'armoryutils', 'stasisutils']
+
+    usage_setup(parser)
+    for module in module_list:
+        globals()[module].usage_setup(parser)
     
-    options, arguments = op.parse_args(sys_argv)
+    options, arguments = parser.parse_args(sys_argv)
     
-    basicparse.usage_defaults(options)
-    stasisutils.usage_defaults(options)
-    
+    for module in module_list:
+        globals()[module].usage_defaults(options)
+    usage_defaults(options)
+
     return options, arguments
+
 
 
 def usage_setup(op, **kwargs):
@@ -152,12 +189,8 @@ class Timeline(object):
             else:
                 sql_list.append('''%s = ?''' % k)
                 arg_list.append(v)
-        ##if index % 500 == 0:
-        ##    print ('''select %s from event where ''' % select_str) + ' and '.join(sql_list), tuple(arg_list)
-        
+
         return conn_execute(self.conn, ('''select %s from aura where ''' % select_str) + ' and '.join(sql_list), tuple(arg_list))
-        
-        #return conn_execute(conn, '''select %s from aura where start_time <= ? and end_time >= ?''', (self.start_dt + (self.width_td * (index+1)), self.start_dt + (self.width_td * index)))
 
 
 class Region(object):
@@ -277,6 +310,11 @@ class Graph(object):
     def render(self, draw, region):
         self.computeValues(region)
         
+        regionTop = region.getTop()
+        regionBottom = region.getBottom()
+        regionLeft = region.getLeft()
+        regionRight = region.getRight()
+        
         old_value = 0.0
         for i, value in enumerate(self.value_list):
             value = value / region.max_value * region.height
@@ -284,41 +322,41 @@ class Graph(object):
             if value >= 1 or old_value >= 1:
                 for render_str, color_str in self.render_list:
                     if render_str == 'uppoint':
-                        draw.point((i + region.getLeft(), region.getBottom() - value), fill=color_str)
+                        draw.point((i + regionLeft, regionBottom - value), fill=color_str)
                     elif render_str == 'upline':
                         if old_value < 1:
-                            draw.line([(i + region.getLeft(), region.getBottom() - value), (i + region.getLeft(), region.getBottom() - old_value)], fill=color_str)
+                            draw.line([(i + regionLeft, regionBottom - value), (i + regionLeft, regionBottom - old_value)], fill=color_str)
                         elif value < 1:
-                            draw.line([(i + region.getLeft() - 1, region.getBottom() - value), (i + region.getLeft() - 1, region.getBottom() - old_value)], fill=color_str)
+                            draw.line([(i + regionLeft - 1, regionBottom - value), (i + regionLeft - 1, regionBottom - old_value)], fill=color_str)
                         elif value >= old_value:
-                            draw.line([(i + region.getLeft(), region.getBottom() - value), (i + region.getLeft(), region.getBottom() - old_value - 1)], fill=color_str)
+                            draw.line([(i + regionLeft, regionBottom - value), (i + regionLeft, regionBottom - old_value - 1)], fill=color_str)
                         else:
-                            draw.line([(i + region.getLeft() - 1, region.getBottom() - value - 1), (i + region.getLeft() - 1, region.getBottom() - old_value)], fill=color_str)
-                            draw.point((i + region.getLeft(), region.getBottom() - value), fill=color_str)
+                            draw.line([(i + regionLeft - 1, regionBottom - value - 1), (i + regionLeft - 1, regionBottom - old_value)], fill=color_str)
+                            draw.point((i + regionLeft, regionBottom - value), fill=color_str)
                             
                     elif render_str == 'upbar':
-                        draw.line([(i + region.getLeft(), region.getBottom() - value), (i + region.getLeft(), region.getBottom())], fill=color_str)
+                        draw.line([(i + regionLeft, regionBottom - value), (i + regionLeft, regionBottom)], fill=color_str)
                     elif render_str == 'downpoint':
-                        draw.point((i + region.getLeft(), region.getTop() + value), fill=color_str)
+                        draw.point((i + regionLeft, regionTop + value), fill=color_str)
                     elif render_str == 'downline':
                         if old_value < 1:
-                            draw.line([(i + region.getLeft(), region.getTop() - value), (i + region.getLeft(), region.getTop() - old_value)], fill=color_str)
+                            draw.line([(i + regionLeft, regionTop - value), (i + regionLeft, regionTop - old_value)], fill=color_str)
                         elif value < 1:
-                            draw.line([(i + region.getLeft() - 1, region.getTop() - value), (i + region.getLeft() - 1, region.getTop() - old_value)], fill=color_str)
+                            draw.line([(i + regionLeft - 1, regionTop - value), (i + regionLeft - 1, regionTop - old_value)], fill=color_str)
                         elif value >= old_value:
-                            draw.line([(i + region.getLeft(), region.getTop() + value), (i + region.getLeft(), region.getTop() + old_value + 1)], fill=color_str)
+                            draw.line([(i + regionLeft, regionTop + value), (i + regionLeft, regionTop + old_value + 1)], fill=color_str)
                         else:
-                            draw.line([(i + region.getLeft() - 1, region.getTop() + value + 1), (i + region.getLeft() - 1, region.getTop() + old_value)], fill=color_str)
-                            draw.point((i + region.getLeft(), region.getTop() + value), fill=color_str)
+                            draw.line([(i + regionLeft - 1, regionTop + value + 1), (i + regionLeft - 1, regionTop + old_value)], fill=color_str)
+                            draw.point((i + regionLeft, regionTop + value), fill=color_str)
                             
                     elif render_str == 'downbar':
-                        draw.line([(i + region.getLeft(), region.getTop() + value), (i + region.getLeft(), region.getTop())], fill=color_str)
+                        draw.line([(i + regionLeft, regionTop + value), (i + regionLeft, regionTop)], fill=color_str)
                     elif render_str == 'vbar':
                         if value > 0:
-                            draw.line([(i + region.getLeft(), region.getBottom()), (i + region.getLeft(), region.getTop())], fill=color_str)
+                            draw.line([(i + regionLeft, regionBottom), (i + regionLeft, regionTop)], fill=color_str)
                     elif render_str == 'imagebar':
                         if value > 0:
-                            draw.line([(i + region.getLeft(), 10000), (i + region.getLeft(), 0)], fill=color_str)
+                            draw.line([(i + regionLeft, 10000), (i + regionLeft, 0)], fill=color_str)
             
             old_value = value
     
@@ -443,34 +481,6 @@ class WipeGraph(SpanGraph):
         
         return 0
 
-#class _HeroismGraph(Graph):
-#    def __init__(self, needsLabel=False):
-#        self.needsLabel = needsLabel
-#        pass
-#
-#    def computeValues(self, region):
-#        return 0
-#    
-#    def render(self, draw, region):
-#        heroism_count = 0
-#        start_index = 0
-#        
-#        for index in range(len(region.timeline)):
-#            heroism_count += region.timeline.getEventData(index, 'count(*)', eventType='SPELL_AURA_APPLIED', spellName="Heroism", destType='PC').fetchone()[0]
-#            heroism_count -= region.timeline.getEventData(index, 'count(*)', eventType='SPELL_AURA_REMOVED', spellName="Heroism", destType='PC').fetchone()[0]
-#
-#            heroism_count += region.timeline.getEventData(index, 'count(*)', eventType='SPELL_AURA_APPLIED', spellName="Bloodlust", destType='PC').fetchone()[0]
-#            heroism_count -= region.timeline.getEventData(index, 'count(*)', eventType='SPELL_AURA_REMOVED', spellName="Bloodlust", destType='PC').fetchone()[0]
-#            
-#            if heroism_count > 0:
-#                if not start_index:
-#                    start_index = index
-#                    
-#                draw.line([(index + region.getLeft(), 10000), (index + region.getLeft(), 0)], fill=css('buff_Heroism'))
-#
-#        if self.needsLabel:
-#            draw.text((region.getLeft() + start_index + 5, region.getTop() + 3), "Hero", font=ImageFont.load_default(), fill=css('text_default'))
-
 
 def region_title(conn, combat, timeline, region_list, options):
     char_list = [x['sourceName'] for x in conn_execute(conn, '''select distinct sourceName from event where combat_id = ? and sourceType = ?''', (combat['id'], 'PC')).fetchall()]
@@ -547,10 +557,19 @@ def region_dps(conn, combat, timeline, region_list, options):
         region_list.append(Region(timeline, "  Damage", graph_list, len(timeline), 0.005, region_list[-1], 'under', True))
 
 
-def main(sys_argv, options, arguments):
-    try:
-        stasisutils.main(sys_argv, options, arguments)
-        conn = basicparse.sqlite_connection(options)
+
+class GraphRun(DataRun):
+    def __init__(self):
+        DataRun.__init__(self, ['CombatRun', 'CastRun', 'WipeRun', 'AuraRun', 'CombatStasisMatchRun'], ['cast'])
+        
+    def impl(self, options):
+        conn = self.conn
+#
+#
+#def main(sys_argv, options, arguments):
+#    try:
+#        stasisutils.main(sys_argv, options, arguments)
+#        conn = basicparse.sqlite_connection(options)
         
         if options.css_str:
             load_css(options.css_str)
@@ -558,9 +577,6 @@ def main(sys_argv, options, arguments):
         print datetime.datetime.now(), "Iterating over combat images..."
         for combat in conn_execute(conn, '''select * from combat order by start_event_id''').fetchall():
             
-            #if combat['id'] < 5:
-            #    continue
-    
             time_list = [x['time'] for x in conn_execute(conn, '''select time from event where combat_id = ?''', (combat['id'],)).fetchall()]
             start_dt = min(time_list)
             end_dt = max(time_list)
@@ -603,15 +619,13 @@ def main(sys_argv, options, arguments):
                     region.render(draw)
                 
                 image.save(file_path)
-    finally:
-        sqlite_print_perf(options.verbose)
-        pass
-            
+GraphRun() # This sets up the dict of runners so that we don't have to call them in __init__
 
 
 
 if __name__ == "__main__":
-    options, arguments = usage(sys.argv[1:])
-    sys.exit(main(sys.argv[1:], options, arguments) or 0)
+    GraphRun().main(sys.argv[1:])
+    #options, arguments = usage(sys.argv[1:])
+    #sys.exit(main(sys.argv[1:], options, arguments) or 0)
 
 # eof

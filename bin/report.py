@@ -1,5 +1,25 @@
 #!/usr/bin/env python
 
+#Copyright (c) 2009, Eli Stevens
+#
+#Permission is hereby granted, free of charge, to any person obtaining a copy
+#of this software and associated documentation files (the "Software"), to deal
+#in the Software without restriction, including without limitation the rights
+#to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+#copies of the Software, and to permit persons to whom the Software is
+#furnished to do so, subject to the following conditions:
+#
+#The above copyright notice and this permission notice shall be included in
+#all copies or substantial portions of the Software.
+#
+#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+#IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+#FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+#AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+#LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+#OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+#THE SOFTWARE.
+
 import cgi
 import collections
 import copy
@@ -109,6 +129,38 @@ def report(conn, options):
     for t in sorted(final_list):
         print >>overall_file, '\t'.join([pretty(x) for x in t])
 
+
+t2f_dict = {}
+def pf(fail_path):
+    line_list = [x.split('\t') for x in file(fail_path)]
+    toon_index = line_list[0].index('toonName')
+    size_index = line_list[0].index('size')
+    norm_index = line_list[0].index('normalizedValue')
+    
+    max_dict = {}
+    for sub_list in line_list[1:]:
+        if int(sub_list[size_index]) > 20:
+            max_dict.setdefault(sub_list[toon_index], 0)
+            max_dict[sub_list[toon_index]] = max(sub_list[norm_index], max_dict[sub_list[toon_index]])
+    for key, value in max_dict.items():
+        t2f_dict.setdefault(key, [])
+        t2f_dict[key].append(value)
+    
+
+def pall(cutoff=0.5):
+    global t2f_dict
+    t2f_dict = {}
+    print '\n'.join(glob.glob('data/reports/*/execution_details.tsv'))
+    #for fail_path in sorted(glob.glob('data/reports/*/execution_details.tsv'), reverse=True)[:10]:
+    for fail_path in sorted(glob.glob('data/reports/*/execution_details.tsv'), reverse=True):
+        pf(fail_path)
+    final_dict = {}
+    for toon, fail_list in t2f_dict.items():
+        if len(fail_list) >= 5:
+            final_dict[toon] = float(len([x for x in fail_list if float(x) >= cutoff])) / len(fail_list)
+    ret_list = sorted(final_dict.items(), key=lambda x: x[1])
+    for x in ret_list:
+        print "%12s" % x[0], '\t', x[1]
 
 def main(sys_argv, options, arguments):
     try:

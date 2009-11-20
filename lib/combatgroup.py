@@ -1,5 +1,25 @@
 #!/usr/bin/env python
 
+#Copyright (c) 2009, Eli Stevens
+#
+#Permission is hereby granted, free of charge, to any person obtaining a copy
+#of this software and associated documentation files (the "Software"), to deal
+#in the Software without restriction, including without limitation the rights
+#to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+#copies of the Software, and to permit persons to whom the Software is
+#furnished to do so, subject to the following conditions:
+#
+#The above copyright notice and this permission notice shall be included in
+#all copies or substantial portions of the Software.
+#
+#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+#IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+#FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+#AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+#LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+#OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+#THE SOFTWARE.
+
 import cgi
 import collections
 import copy
@@ -19,53 +39,49 @@ import urllib2
 import basicparse
 import armoryutils
 
-from sqliteutils import conn_execute
+#from sqliteutils import conn_execute, DurationManager
+from sqliteutils import *
 
-def usage(sys_argv):
-    op = optparse.OptionParser("Usage: wowspi %s [options]" % __file__.rsplit('/')[-1].split('.')[0])
-    usage_setup(op)
-    basicparse.usage_setup(op)
-    return op.parse_args(sys_argv)
-
-def usage_setup(op, **kwargs):
-    pass
-    #if kwargs.get('prune', True):
-    #    op.add_option("--prune"
-    #            , help="Prune the resulting combat encounters to only include those where the named actors were present (ex: 'Sartharion,Tenebron,Shadron,Vesperon').  Defaults to all T7-T9 raid bosses."
-    #            , metavar="ACTOR"
-    #            , dest="prune_str"
-    #            , action="store"
-    #            , type="str"
-    #            , default="Sartharion,Malygos,Anub'Rekhan,Grand Widow Faerlina,Maexxna,Noth the Plaguebringer,Heigan the Unclean,Loatheb," +\
-    #                      "Instructor Razuvious,Gothik the Harvester,Patchwerk,Grobbulus,Gluth,Thaddius,Sapphiron,Kel'Thuzad," +\
-    #                      "Ignis the Furnace Master,Razorscale,XT-002 Deconstructor,Steelbreaker,Kologarn,Auriya,Aerial Command Unit,Leviathan Mk II,VX-001,Thorim,Hodir,Freya," +\
-    #                      "General Vezax,Guardian of Yogg Saron,Crusher Tentacle,Corrupter Tentacle,Constrictor Tentacle,Yogg Saron" +\
-    #                      "Gormok the Impaler,Acidmaw,Dreadscale,Icehowl,Lord Jaraxxus,Eydis Darkbane,Fjola Lightbane,Anub'arak,Nerubian Burrower,Onyxia" +\
-    #                      "Gorgrim Shadowcleave,Birana Stormhoof,Erin Misthoof,Ruj'kah,Ginselle Blightslinger,Liandra Suncaller,Malithas Brightblade,Caiphus the Stern,Vivienne Blackwhisper,Maz'dinah,Broln Stouthorn,Thrakgar,Harkzog,Narrhok Steelbreaker",
-    #        )
-def usage_defaults(options):
-    pass
+#def usage(sys_argv):
+#    #op = optparse.OptionParser("Usage: wowspi %s [options]" % __file__.rsplit('/')[-1].split('.')[0])
+#    #usage_setup(op)
+#    #basicparse.usage_setup(op)
+#    #return op.parse_args(sys_argv)
+#
+#    parser = optparse.OptionParser("Usage: wowspi %s [options]" % __file__.rsplit('/')[-1].split('.')[0])
+#    module_list = ['basicparse']
+#
+#    usage_setup(parser)
+#    for module in module_list:
+#        globals()[module].usage_setup(parser)
+#    
+#    options, arguments = parser.parse_args(sys_argv)
+#    
+#    for module in module_list:
+#        globals()[module].usage_defaults(options)
+#    usage_defaults(options)
+#
+#    return options, arguments
+#
+#
+#def usage_setup(op, **kwargs):
+#    pass
+#
+#def usage_defaults(options):
+#    pass
 
 
 class LogSegment(object):
-    #aggregateKey_tup = ('amount', 'extra', 'resisted', 'blocked', 'absorbed')
-
     def __init__(self, event, closeDelay=5):
-        global segment_counter
-        
         self.event_list = [event]
         self.closeDelay = closeDelay
         self.closeEvent = None
         self.npcEvent = None
         self.releaseEvent = None
-        #self.aggregate_dict = {}
-        self.actor_set = set()
+        #self.actor_set = set()
         self.db_id = 0
-        
-        #self.seenCombat_bool = False
 
     def addEvent(self, event):
-        #if prefix_dict[event['prefix']][0] and suffix_dict[event['suffix']][0]:
         if event['eventType'] == 'SPELL_AURA_APPLIED' and event['spellName'] == 'Swift Spectral Gryphon':
             self.releaseEvent = event
         else:
@@ -77,10 +93,15 @@ class LogSegment(object):
                 elif event['sourceType'] == 'PC' and event['destType'] == 'NPC' and event['suffix'] == '_DAMAGE':
                     self.npcEvent = event
 
-            if event['eventType'] == 'UNIT_DIED' and event['destType'] == 'PC' and event['fakeDeath'] != 1:
-                self.closeEvent = event
-            elif event['suffix'] in ('_SUMMON', '_RESURRECT') and event['sourceType'] == 'PC':
-                self.closeEvent = event
+            try:
+                if event['eventType'] == 'UNIT_DIED' and event['destType'] == 'PC' and event['fakeDeath'] != 1:
+                    self.closeEvent = event
+                elif event['suffix'] in ('_SUMMON', '_RESURRECT') and event['sourceType'] == 'PC':
+                    self.closeEvent = event
+            except Exception, e:
+                print e
+                print event.keys()
+                print event
 
             if event['suffix'] == '_DAMAGE' or event['suffix'] == '_HEAL':
                 try:
@@ -95,16 +116,6 @@ class LogSegment(object):
     def finalizeClose(self, conn, combat_id):
         if not self.closeEvent:
             self.closeEvent = self.event_list[-1]
-
-        self.db_id = conn_execute(conn, '''insert into segment (start_event_id, close_event_id, end_event_id, combat_id) values (?, ?, ?, ?)''', \
-                (self.event_list[0]['id'], self.closeEvent['id'], self.event_list[-1]['id'], combat_id)).lastrowid
-        
-        #for event in self.event_list:
-        #    conn_execute(conn, '''update event set combat_id = ?, segment_id = ? where id = ?''', (combat_id, self.db_id, event['id']))
-            
-        conn_execute(conn, '''update event set combat_id = ?, segment_id = ? where time >= ? and time <= ?''', (combat_id, self.db_id, self.event_list[0]['time'], self.event_list[-1]['time']))
-        
-        #conn.commit()
 
     def isOpen(self):
         if self.releaseEvent:
@@ -156,9 +167,6 @@ class LogCombat(object):
             if not self.openEvent and event['destType'] == 'NPC':
                 self.openEvent = event
 
-        #if not self.isOpen():
-        #    self.finalizeClose(conn, require_set)
-
     def isOpen(self):
         if not self.closeEvent:
             return True
@@ -184,83 +192,19 @@ class LogCombat(object):
                         
         while self.segment_list and self.segment_list[-1].npcEvent is None:
             self.segment_list.pop()
-        #self.segment_list = [x for x in self.segment_list if x.prune(require_set)]
-        #
-        ##self.prune_set = set()
-        #for x in self.segment_list:
-        #    self.prune_set.update(x.prune(require_set))
-        #
-        ##print self.segment_list, self.prune_set
+
         return self.segment_list
+
 
     def finalizeClose(self, conn, require_set):
         self.db_id = conn_execute(conn, '''insert into combat (start_event_id, close_event_id, end_event_id, instance, encounter) values (?, ?, ?, ?, ?)''', \
                 (self.segment_list[0].event_list[0]['id'], self.closeEvent['id'], self.segment_list[-1].event_list[-1]['id'], self.instance_str, self.encounter_str)).lastrowid
         
-        actor_dict = dict([((x['actorType'], x['actorName']), x['id']) for x in conn_execute(conn, '''select id, actorType, actorName from actor''')])
-        
         for segment in self.segment_list:
             segment.finalizeClose(conn, self.db_id)
             
-        #conn.commit()
-            
-        wound_dict = {} #collections.defaultdict(int)
-        active_dict = {}
-        aura_dict = {}
-        for event in self.eventIter():
-            if event['destType'] == 'PC':
-                wound_dict.setdefault(event['destName'], 0)
-                
-                if event['suffix'] == '_DAMAGE':
-                    wound_dict[event['destName']] += event['amount'] - event['extra']
-                elif event['suffix'] == '_HEAL':
-                    wound_dict[event['destName']] -= event['amount'] - event['extra']
-                    if event['extra'] > 0:
-                        wound_dict[event['destName']] = -event['extra']
+        conn_execute(conn, '''update event set combat_id = ? where id >= ? and id <= ?''', (self.db_id, self.segment_list[0].event_list[0]['id'], self.segment_list[-1].event_list[-1]['id']))
 
-                if event['suffix'] == '_DIED' or wound_dict[event['destName']] <= 0:
-                    del wound_dict[event['destName']]
-
-            if event['sourceType'] == 'PC':
-                if event['suffix'] == '_CAST_START':
-                    active_dict[event['sourceName']] = event['spellName']
-                elif 'sourceName' in active_dict and (event['suffix'] == '_CAST_SUCCESS' or event['suffix'] == '_CAST_FAILED'):
-                    del active_dict[event['sourceName']]
-                    
-            # FIXME: This could probably be optimized with some clever time >= ? and time < ? stuff
-            conn_execute(conn, '''update event set active_dict = ?, wound_dict = ? where id = ?''', (active_dict, wound_dict, event['id']))
-            
-            if event['sourceName'] and (event['sourceType'], event['sourceName']) not in actor_dict:
-                actor_dict[(event['sourceType'], event['sourceName'])] = conn_execute(conn, '''insert into actor (actorType, actorName) values (?, ?)''', (event['sourceType'], event['sourceName'])).lastrowid
-            if event['destName'] and (event['destType'], event['destName']) not in actor_dict:
-                actor_dict[(event['destType'], event['destName'])] = conn_execute(conn, '''insert into actor (actorType, actorName) values (?, ?)''', (event['destType'], event['destName'])).lastrowid
-                
-            if event['eventType'] == 'SPELL_AURA_REMOVED':
-                key = (event['destType'], event['destName'], event['spellName'], event['spellId'])
-                
-                if key in aura_dict:
-                    conn_execute(conn, '''update aura set end_event_id = ?, end_time = ? where start_event_id = ?''', (event['id'], event['time'], aura_dict[key]['id']))
-    
-                    del aura_dict[key]
-
-            elif event['eventType'] == 'SPELL_AURA_APPLIED':
-                key = (event['destType'], event['destName'], event['spellName'], event['spellId'])
-                
-                #aura_dict[key].append((event['spellName'], event['id'], event['time'], event['destType'], event['destName']))
-                
-                #print repr(aura_dict[key][-1])
-                conn_execute(conn, '''insert into aura (start_event_id, start_time, end_event_id, end_time, sourceType, sourceName, destType, destName, spellName, spellId) values (?,?,?,?,?,?,?,?,?,?)''',
-                             (event['id'], event['time'], self.closeEvent['id'], self.closeEvent['time'], event['sourceType'], event['sourceName'], event['destType'], event['destName'], event['spellName'], event['spellId']))
-                
-                if key in aura_dict:
-                    conn_execute(conn, '''update aura set end_event_id = ?, end_time = ? where start_event_id = ?''', (event['id'], event['time'], aura_dict[key]['id']))
-    
-                    del aura_dict[key]
-                    
-                aura_dict[key] = event
-                
-
-            
         role_sql = '''select name, sum(d) damage, sum(h) healing, sum(v) overhealed from (
             select sourceName name, sum(amount) - sum(extra) d, 0 h, 0 v from event where sourceType='PC' and suffix='_DAMAGE' and combat_id=? group by sourceName
             union
@@ -289,73 +233,6 @@ class LogCombat(object):
         raidSize_int = len(healer_set) + len(tank_set) + len(dps_set)
         conn_execute(conn, '''update combat set size = ?, dps_list = ?, healer_list = ?, tank_list = ? where id = ?''', (raidSize_int, dps_list, healer_list, tank_list, self.db_id))
         conn.commit()
-        
-        healersDead_set = set()
-        tanksDead_set = set()
-        dpsDead_set = set()
-        for event in self.eventIter():
-            if event['eventType'] == 'UNIT_DIED' and event['destType'] == 'PC' and event['fakeDeath'] != 1:
-                if event['destName'] in healer_set:
-                    healersDead_set.add(event['destName'])
-                elif event['destName'] in tank_set:
-                    tanksDead_set.add(event['destName'])
-                elif event['destName'] in dps_set:
-                    dpsDead_set.add(event['destName'])
-                    
-                conn_execute(conn, '''update event set healersDead = ?, tanksDead = ?, dpsDead = ? where combat_id = ? and time >= ?''', (len(healersDead_set), len(tanksDead_set), len(dpsDead_set), self.db_id, event['time']))
-            elif event['eventType'] == 'SPELL_RESURRECT' and event['destType'] == 'PC':
-                #print "rez event:", event
-                if event['destName'] in healersDead_set:
-                    healersDead_set.remove(event['destName'])
-                elif event['destName'] in tanksDead_set:
-                    tanksDead_set.remove(event['destName'])
-                elif event['destName'] in dpsDead_set:
-                    dpsDead_set.remove(event['destName'])
-                else:
-                    print datetime.datetime.now(), "Unknown rez event:", event
-                    
-                conn_execute(conn, '''update event set healersDead = ?, tanksDead = ?, dpsDead = ? where combat_id = ? and time >= ?''', (len(healersDead_set), len(tanksDead_set), len(dpsDead_set), self.db_id, event['time']))
-        conn.commit()
-        
-        healersHealing_set = set()
-        update_list = []
-        for event in basicparse.getEventData(conn, orderBy='time desc', combat_id=self.db_id, eventType='SPELL_HEAL', sourceType='PC', sourceName=tuple(healer_set)):
-            
-            if event['sourceName'] not in healersHealing_set:
-                healersHealing_set.add(event['sourceName'])
-                update_list.append(('''update event set healersHealing = ? where time <= ? and combat_id = ?''', (len(healersHealing_set), event['time'], self.db_id)))
-            
-            if healersHealing_set == healer_set:
-                break
-        
-        for sql_str, values_tup in update_list:
-            conn_execute(conn, sql_str, values_tup)
-        conn.commit()
-        
-        dead_int = len(healersDead_set) + len(tanksDead_set) + len(dpsDead_set)
-        
-        # Do we need to bother?  If half of the raid is alive at the end, no.
-        if raidSize_int and float(dead_int) / raidSize_int > 0.5:
-            update_list = []
-            for event in basicparse.getEventData(conn, orderBy='time', combat_id=self.db_id, healersDead=len(healer_set)):
-                update_list.append(('''update event set wipe = 1 where time >= ? and combat_id = ?''', (event['time'], self.db_id)))
-                break
-                
-            for event in basicparse.getEventData(conn, orderBy='time', combat_id=self.db_id, tanksDead=len(tank_set)):
-                update_list.append(('''update event set wipe = 1 where time >= ? and combat_id = ?''', (event['time'], self.db_id)))
-                break
-                
-            for event in basicparse.getEventData(conn, orderBy='time', combat_id=self.db_id, healersHealing=0):
-                update_list.append(('''update event set wipe = 1 where time >= ? and combat_id = ?''', (event['time'], self.db_id)))
-                break
-                
-            for sql_str, values_tup in update_list:
-                conn_execute(conn, sql_str, values_tup)
-            conn.commit()
-            
-            
-            
-            
 
 
     def eventIter(self):
@@ -368,47 +245,40 @@ class LogCombat(object):
         return "<LogCombat %s> %d segments\n%s" % (self.db_id, len(self.segment_list), "\n".join(["\t\t%d: %s" % (i, repr(x)) for i, x in enumerate(self.segment_list)]))
 
 
-def main(sys_argv, options, arguments):
-    basicparse.main(sys_argv, options, arguments)
-    conn = basicparse.sqlite_connection(options)
-    
-    if not options.force:
-        try:
-            if conn_execute(conn, '''select * from combat limit 1''').fetchone():
-                print datetime.datetime.now(), "Skipping combat generation..."
-                return
-        except:
-            pass
-
-    try:
-        basicparse.sqlite_insureColumns(conn, 'event', [('segment_id', 'int'), ('combat_id', 'int'),
-                ('wound_dict', 'json'), ('active_dict', 'json'),
+class CombatRun(DataRun):
+    def __init__(self):
+        DataRun.__init__(self, ['ParseRun', 'FakeDeathRun'], ['combat'])
+        
+    def impl(self, options):
+        basicparse.sqlite_insureColumns(self.conn, 'event', [('combat_id', 'int'), #('segment_id', 'int'), 
+                #('wound_dict', 'json'), ('active_dict', 'json'),
                 ('absorbType', 'str'), ('absorbName', 'str'),
-                ('healersHealing', 'int default 0'), ('healersDead', 'int default 0'), ('tanksDead', 'int default 0'), ('dpsDead', 'int default 0'), ('wipe', 'int default 0'),
+                #('healersHealing', 'int default 0'), ('healersDead', 'int default 0'), ('tanksDead', 'int default 0'), ('dpsDead', 'int default 0'), ('wipe', 'int default 0'),
             ])
         
-        conn_execute(conn, '''drop index if exists ndx_event_combat_time''')
-        conn_execute(conn, '''update event set segment_id = ?, combat_id = ?, wound_dict = ?, active_dict = ?''', (0, 0, {}, {}))
-        conn_execute(conn, '''create index ndx_event_combat_time on event (combat_id, time)''')
-        conn_execute(conn, '''create index ndx_event_combat_source_time on event (combat_id, sourceType, sourceName, time)''')
+        conn_execute(self.conn, '''drop index if exists ndx_event_combat_time''')
+        conn_execute(self.conn, '''drop index if exists ndx_event_combat_source_time''')
+        conn_execute(self.conn, '''update event set combat_id = ?''', (0,))
+        conn_execute(self.conn, '''create index ndx_event_combat_time on event (combat_id, time)''')
+        conn_execute(self.conn, '''create index ndx_event_combat_source_time on event (combat_id, sourceType, sourceName, time)''')
         
-        conn_execute(conn, '''drop table if exists combat''')
-        conn_execute(conn, '''create table combat (id integer primary key, start_event_id, close_event_id, end_event_id, size int, instance, encounter, dps_list json, healer_list json, tank_list json)''')
+        #conn_execute(self.conn, '''drop table if exists combat''')
+        conn_execute(self.conn, '''create table combat (id integer primary key, start_event_id, close_event_id, end_event_id, size int, instance, encounter, dps_list json, healer_list json, tank_list json)''')
     
-        conn_execute(conn, '''drop table if exists segment''')
-        conn_execute(conn, '''create table segment (id integer primary key, start_event_id, close_event_id, end_event_id, combat_id)''')
+        #conn_execute(self.conn, '''drop table if exists segment''')
+        #conn_execute(self.conn, '''create table segment (id integer primary key, start_event_id, close_event_id, end_event_id, combat_id)''')
     
-        conn_execute(conn, '''drop table if exists actor''')
-        conn_execute(conn, '''create table actor (id integer primary key, actorType, actorName, class)''')
+        #conn_execute(self.conn, '''drop table if exists actor''')
+        #conn_execute(self.conn, '''create table actor (id integer primary key, actorType, actorName, class)''')
     
-        conn_execute(conn, '''drop table if exists auralist''')
-        conn_execute(conn, '''drop table if exists aura''')
-        conn_execute(conn, '''create table aura (id integer primary key, start_event_id int, end_event_id int, start_time timestamp, end_time timestamp, sourceType str, sourceName str, destType str, destName str, spellName str, spellId int)''')
-        conn_execute(conn, '''create index ndx_aura_time on aura (start_time, end_time, spellName, destName)''')
-        conn_execute(conn, '''create index ndx_aura_name_time on aura (spellName, start_time, end_time, destName)''')
-        conn_execute(conn, '''create index ndx_aura_dest on aura (destType, destName, spellName, start_time, end_time)''')
-        conn_execute(conn, '''create index ndx_aura_id on aura (start_event_id)''')
-        conn.commit()
+        #conn_execute(self.conn, '''drop table if exists auralist''')
+        #conn_execute(self.conn, '''drop table if exists aura''')
+        #conn_execute(self.conn, '''create table aura (id integer primary key, start_event_id int, end_event_id int, start_time timestamp, end_time timestamp, sourceType str, sourceName str, destType str, destName str, spellName str, spellId int)''')
+        #conn_execute(self.conn, '''create index ndx_aura_time on aura (start_time, end_time, spellName, destName)''')
+        #conn_execute(self.conn, '''create index ndx_aura_name_time on aura (spellName, start_time, end_time, destName)''')
+        #conn_execute(self.conn, '''create index ndx_aura_dest on aura (destType, destName, spellName, start_time, end_time)''')
+        #conn_execute(self.conn, '''create index ndx_aura_id on aura (start_event_id)''')
+        self.conn.commit()
         
         
         print datetime.datetime.now(), "Building combats..."
@@ -420,8 +290,8 @@ def main(sys_argv, options, arguments):
         combat_list = []
         combat = None
         
-        cur = conn.cursor()
-        cur.execute('''select * from event order by time''')
+        cur = self.conn.cursor()
+        cur.execute('''select * from event order by id''')
         event_list = cur.fetchmany()
         
         # This loop is structured oddly so that we don't have to pull in all
@@ -441,31 +311,99 @@ def main(sys_argv, options, arguments):
                 del cur
                 
                 if combat.prune(require_set):
-                    combat.finalizeClose(conn, require_set)
-                    conn.commit()
+                    combat.finalizeClose(self.conn, require_set)
+                    self.conn.commit()
                     
                 del combat
                 combat = None
                     
-                cur = conn.cursor()
-                cur.execute('''select * from event where time >= ? order by time''', (event['time'],))
+                cur = self.conn.cursor()
+                cur.execute('''select * from event where id >= ? order by id''', (event['id'],))
                 event_list = []
                 
             if not event_list:
                 event_list = cur.fetchmany()
                 
         del cur
+        
 
-    except:
-        #try:
-        #    conn_execute(conn, '''drop table if exists combat''')
-        #except:
-        #    pass
-        raise
+    def usage_setup(self, parser, **kwargs):
+        if kwargs.get('armorydb', True):
+            parser.add_option("--armorydb"
+                    , help="Desired sqlite database output file name."
+                    , metavar="DB"
+                    , dest="armorydb_path"
+                    , action="store"
+                    , type="str"
+                    , default="armory.db"
+                )
+    
+        if kwargs.get('realm', True):
+            parser.add_option("--realm"
+                    , help="Realm to use for armory data queries."
+                    , metavar="REALM"
+                    , dest="realm_str"
+                    , action="store"
+                    , type="str"
+                    , default="Proudmoore"
+                )
+        
+        if kwargs.get('region', True):
+            parser.add_option("--region"
+                    , help="Region to use for armory data queries (www, eu, kr, cn, tw)."
+                    , metavar="REGION"
+                    , dest="region_str"
+                    , action="store"
+                    , type="str"
+                    , default="www"
+                )        
+CombatRun() # This sets up the dict of runners so that we don't have to call them in __init__
+
+
+class FakeDeathRun(DataRun):
+    def __init__(self):
+        DataRun.__init__(self, ['ParseRun'], [])
+        
+    def impl(self, options):
+        print datetime.datetime.now(), "Flagging fake deaths..."
+        #flagFakeDeaths(self.conn)
+        
+        sqlite_insureColumns(self.conn, 'event', [('fakeDeath', 'int default 0')])
+        
+        update_list = []
+        
+        for event in basicparse.getEventData(self.conn, orderBy='time', eventType='UNIT_DIED', destType='PC'):
+            where_list = []
+            where_list.append(('time >= ?', event['time'] - datetime.timedelta(seconds=0.5)))
+            where_list.append(('time <= ?', event['time'] + datetime.timedelta(seconds=0.5)))
+            
+            buffsLost_int = basicparse.getEventData(self.conn, 'count(*)', where_list, destType='PC', destName=event['destName'], eventType='SPELL_AURA_REMOVED').fetchone()[0]
+            
+            if buffsLost_int < 10:
+                update_list.append(('''update event set fakeDeath = 1 where id = ?''', (event['id'],)))
+                
+        for sql_str, values_tup in update_list:
+            conn_execute(self.conn, sql_str, values_tup)
+        self.conn.commit()
+FakeDeathRun() # This sets up the dict of runners so that we don't have to call them in __init__
+        
+
+#def main(sys_argv, options, arguments):
+#    try:
+#        conn = sqlite_connection(options)
+#        
+#        WipeRun(conn).execute(options, options.force)
+#        #FakeDeathRun(conn).execute(options, options.force)
+#
+#    finally:
+#        sqlite_print_perf(options.verbose)
+#        pass
+
 
 
 if __name__ == "__main__":
-    options, arguments = usage(sys.argv[1:])
-    sys.exit(main(sys.argv[1:], options, arguments) or 0)
+    CombatRun().main(sys.argv[1:])
+    #options, arguments = usage(sys.argv[1:])
+    #sys.exit(main(sys.argv[1:], options, arguments) or 0)
 
 # eof
