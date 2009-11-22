@@ -40,45 +40,45 @@ import xml.etree.ElementTree
 from config import instanceData
 from sqliteutils import *
 
-
-def usage(sys_argv):
-    op = optparse.OptionParser("Usage: wowspi %s [options]" % __file__.rsplit('/')[-1].split('.')[0])
-    usage_setup(op)
-    return op.parse_args(sys_argv)
-
-def usage_setup(op, **kwargs):
-    if kwargs.get('armorydb', True):
-        op.add_option("--armorydb"
-                , help="Desired sqlite database output file name."
-                , metavar="DB"
-                , dest="armorydb_path"
-                , action="store"
-                , type="str"
-                , default="armory.db"
-            )
-
-    if kwargs.get('realm', True):
-        op.add_option("--realm"
-                , help="Realm to use for armory data queries."
-                , metavar="REALM"
-                , dest="realm_str"
-                , action="store"
-                , type="str"
-                , default="Proudmoore"
-            )
-    
-    if kwargs.get('region', True):
-        op.add_option("--region"
-                , help="Region to use for armory data queries (www, eu, kr, cn, tw)."
-                , metavar="REGION"
-                , dest="region_str"
-                , action="store"
-                , type="str"
-                , default="www"
-            )
-
-def usage_defaults(options):
-    pass
+#
+#def usage(sys_argv):
+#    op = optparse.OptionParser("Usage: wowspi %s [options]" % __file__.rsplit('/')[-1].split('.')[0])
+#    usage_setup(op)
+#    return op.parse_args(sys_argv)
+#
+#def usage_setup(op, **kwargs):
+#    if kwargs.get('armorydb', True):
+#        op.add_option("--armorydb"
+#                , help="Desired sqlite database output file name."
+#                , metavar="DB"
+#                , dest="armorydb_path"
+#                , action="store"
+#                , type="str"
+#                , default="armory.db"
+#            )
+#
+#    if kwargs.get('realm', True):
+#        op.add_option("--realm"
+#                , help="Realm to use for armory data queries."
+#                , metavar="REALM"
+#                , dest="realm_str"
+#                , action="store"
+#                , type="str"
+#                , default="Proudmoore"
+#            )
+#    
+#    if kwargs.get('region', True):
+#        op.add_option("--region"
+#                , help="Region to use for armory data queries (www, eu, kr, cn, tw)."
+#                , metavar="REGION"
+#                , dest="region_str"
+#                , action="store"
+#                , type="str"
+#                , default="www"
+#            )
+#
+#def usage_defaults(options):
+#    pass
 
 
 

@@ -274,12 +274,14 @@ def clumpDebuff(conn, combat, debuffSpellId, ignoredTargets=2, **kwargs):
     
 
 
-def main(sys_argv, options, arguments):
-    try:
-        combatgroup.main(sys_argv, options, arguments)
-        conn = sqlite_connection(options)
+class ExecutionRun(DataRun):
+    def __init__(self):
+        DataRun.__init__(self, ['CombatRun'], ['execution'])
         
-        conn_execute(conn, '''drop table if exists execution''')
+    def impl(self, options):
+        conn = self.conn
+        
+        #conn_execute(conn, '''drop table if exists execution''')
         conn_execute(conn, '''create table execution (id integer primary key, date_str str, type str, combat_id int, typeName str, toonName str, value float default 0.0, normalizedValue float default 0.0)''')
         conn_execute(conn, '''create index ndx_execution_which on execution (toonName, type, combat_id, typeName)''')
         conn_execute(conn, '''create index ndx_execution_when on execution (date_str, type, combat_id, typeName, toonName)''')
@@ -319,10 +321,7 @@ def main(sys_argv, options, arguments):
         #        
         #        conn_execute(conn, '''insert into execution (instance, encounter, typeName, toonName, value, date_str) values (?,?,?,?,?,?)''', key + (k, v, date_str))
         conn.commit()
-    finally:
-        sqlite_print_perf(options.verbose)
-        pass
-
+ExecutionRun()
 
 
 if __name__ == "__main__":

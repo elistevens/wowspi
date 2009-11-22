@@ -78,7 +78,7 @@ class LogSegment(object):
         self.closeEvent = None
         self.npcEvent = None
         self.releaseEvent = None
-        #self.actor_set = set()
+        self.actor_set = set()
         self.db_id = 0
 
     def addEvent(self, event):
@@ -248,6 +248,7 @@ class LogCombat(object):
 class CombatRun(DataRun):
     def __init__(self):
         DataRun.__init__(self, ['ParseRun', 'FakeDeathRun'], ['combat'])
+        self.version = datetime.datetime.now()
         
     def impl(self, options):
         basicparse.sqlite_insureColumns(self.conn, 'event', [('combat_id', 'int'), #('segment_id', 'int'), 
@@ -261,6 +262,7 @@ class CombatRun(DataRun):
         conn_execute(self.conn, '''update event set combat_id = ?''', (0,))
         conn_execute(self.conn, '''create index ndx_event_combat_time on event (combat_id, time)''')
         conn_execute(self.conn, '''create index ndx_event_combat_source_time on event (combat_id, sourceType, sourceName, time)''')
+        conn_execute(self.conn, '''create index ndx_event_combat_suffix_spell on event (combat_id, suffix, sourceName)''')
         
         #conn_execute(self.conn, '''drop table if exists combat''')
         conn_execute(self.conn, '''create table combat (id integer primary key, start_event_id, close_event_id, end_event_id, size int, instance, encounter, dps_list json, healer_list json, tank_list json)''')

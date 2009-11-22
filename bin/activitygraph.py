@@ -445,9 +445,10 @@ class SpanGraph(Graph):
                 last = index
             
 class AuraGraph(SpanGraph):
-    def __init__(self, buff, label=None, limit=True, **kwargs):
+    def __init__(self, combat, buff, label=None, limit=True, **kwargs):
         SpanGraph.__init__(self, label or buff, limit)
         
+        self.combat = combat
         self.buff = buff
         self.kwargs = kwargs
         self.css_str = 'aura.' + self.buff
@@ -456,7 +457,7 @@ class AuraGraph(SpanGraph):
         self.index_list = []
         
         for index in range(len(region.timeline)):
-            count = region.timeline.getAuraData(index, 'count(*)', spellName=self.buff, **self.kwargs).fetchone()[0]
+            count = region.timeline.getAuraData(index, 'count(*)', spellName=self.buff, combat_id=self.combat['id'], **self.kwargs).fetchone()[0]
                 
             if count:
                 self.index_list.append(index)
@@ -487,7 +488,7 @@ def region_title(conn, combat, timeline, region_list, options):
     char_dict = armoryutils.sqlite_scrapeCharacters(options.armorydb_path, char_list, options.realm_str, options.region_str)
     
     region_list.extend([Region(timeline, '%s: %s, %s' % (combat['instance'], combat['encounter'], timeline.start_dt),
-            [DeathGraph(char_dict), TimeGraph(), WipeGraph(), AuraGraph("Heroism", "Hero", False)],
+            [DeathGraph(char_dict), TimeGraph(), WipeGraph(), AuraGraph(combat, "Heroism", "Hero", False)],
             len(timeline), 20)])
     
 def region_bossDpsHealing(conn, combat, timeline, region_list, options):
@@ -516,7 +517,7 @@ def region_healers(conn, combat, timeline, region_list, options):
         region_list.append(Region(timeline, ("%s: %s" % (healer_str, healer_int)), graph_list, len(timeline), 15, region_list[-1], 'under'))
 
         graph_list = []
-        graph_list.append(AuraGraph("Mark of the Faceless", "MotF", True, destType='PC', destName=healer_str))
+        graph_list.append(AuraGraph(combat, "Mark of the Faceless", "MotF", True, destType='PC', destName=healer_str))
         region_list.append(Region(timeline, "Auras", graph_list, len(timeline), 15, region_list[-1], 'under'))
 
         graph_list = []
@@ -543,7 +544,7 @@ def region_dps(conn, combat, timeline, region_list, options):
         region_list.append(Region(timeline, ("%s: %s" % (dps_str, dps_int)), graph_list, len(timeline), 15, region_list[-1], 'under'))
 
         graph_list = []
-        graph_list.append(AuraGraph("Mark of the Faceless", "MotF", True, destType='PC', destName=dps_str))
+        graph_list.append(AuraGraph(combat, "Mark of the Faceless", "MotF", True, destType='PC', destName=dps_str))
         region_list.append(Region(timeline, "Auras", graph_list, len(timeline), 15, region_list[-1], 'under'))
 
         graph_list = []
@@ -561,6 +562,7 @@ def region_dps(conn, combat, timeline, region_list, options):
 class GraphRun(DataRun):
     def __init__(self):
         DataRun.__init__(self, ['CombatRun', 'CastRun', 'WipeRun', 'AuraRun', 'CombatStasisMatchRun'], ['cast'])
+        self.version = datetime.datetime.now()
         
     def impl(self, options):
         conn = self.conn
@@ -574,7 +576,7 @@ class GraphRun(DataRun):
         if options.css_str:
             load_css(options.css_str)
         
-        print datetime.datetime.now(), "Iterating over combat images..."
+        #print datetime.datetime.now(), "Iterating over combat images..."
         for combat in conn_execute(conn, '''select * from combat order by start_event_id''').fetchall():
             
             time_list = [x['time'] for x in conn_execute(conn, '''select time from event where combat_id = ?''', (combat['id'],)).fetchall()]

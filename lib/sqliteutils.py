@@ -34,7 +34,7 @@ import optparse
 #import re
 import sqlite3
 #import subprocess
-#import sys
+import sys
 #import time
 #import urllib
 #import urllib2
@@ -280,8 +280,10 @@ class DataRun(object):
             
         if self.needsRun(options):
             self.cleanup()
+            n = datetime.datetime.now()
             print datetime.datetime.now(), "Starting: %s..." % self.name
             self.impl(options)
+            print datetime.datetime.now(), "Finished: %s (%s)" % (self.name, datetime.datetime.now() - n)
             
             conn_execute(self.conn, '''update run set mostRecent = ? where name = ?''', (False, self.name))
             conn_execute(self.conn, '''insert into run (time, mostRecent, version, name) values (?,?,?,?)''', (datetime.datetime.now(), True, self.version, self.name))

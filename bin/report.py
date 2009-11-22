@@ -50,44 +50,44 @@ from config import css, load_css, instanceData
 
 from sqliteutils import *
 
-def usage(sys_argv):
-    parser = optparse.OptionParser("Usage: wowspi %s [options]" % __file__.rsplit('/')[-1].split('.')[0])
-    module_list = ['basicparse', 'combatgroup', 'stasisutils', 'execution']
-
-    usage_setup(parser)
-    for module in module_list:
-        globals()[module].usage_setup(parser)
-    
-    options, arguments = parser.parse_args(sys_argv)
-    
-    for module in module_list:
-        globals()[module].usage_defaults(options)
-    usage_defaults(options)
-
-    return options, arguments
-
-
-def usage_setup(op, **kwargs):
-    pass
-    #if kwargs.get('dps', True):
-    #    op.add_option("--dps"
-    #            , help="Compute DPS rankings"
-    #            #, metavar="PATH"
-    #            , dest="dps_bool"
-    #            , action="store_true"
-    #            #, type="str"
-    #            #, default="armory.db"
-    #        )
-    #
-    #if kwargs.get('execution', True):
-    #    op.add_option("--execution"
-    #            , help="Compute execution failures."
-    #            , dest="execution_bool"
-    #            , action="store_true"
-    #        )
-
-def usage_defaults(options):
-    pass
+#def usage(sys_argv):
+#    parser = optparse.OptionParser("Usage: wowspi %s [options]" % __file__.rsplit('/')[-1].split('.')[0])
+#    module_list = ['basicparse', 'combatgroup', 'stasisutils', 'execution']
+#
+#    usage_setup(parser)
+#    for module in module_list:
+#        globals()[module].usage_setup(parser)
+#    
+#    options, arguments = parser.parse_args(sys_argv)
+#    
+#    for module in module_list:
+#        globals()[module].usage_defaults(options)
+#    usage_defaults(options)
+#
+#    return options, arguments
+#
+#
+#def usage_setup(op, **kwargs):
+#    pass
+#    #if kwargs.get('dps', True):
+#    #    op.add_option("--dps"
+#    #            , help="Compute DPS rankings"
+#    #            #, metavar="PATH"
+#    #            , dest="dps_bool"
+#    #            , action="store_true"
+#    #            #, type="str"
+#    #            #, default="armory.db"
+#    #        )
+#    #
+#    #if kwargs.get('execution', True):
+#    #    op.add_option("--execution"
+#    #            , help="Compute execution failures."
+#    #            , dest="execution_bool"
+#    #            , action="store_true"
+#    #        )
+#
+#def usage_defaults(options):
+#    pass
 
 def pretty(x):
     if isinstance(x, float):

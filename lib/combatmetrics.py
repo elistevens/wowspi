@@ -38,7 +38,7 @@ import urllib2
 
 import basicparse
 import armoryutils
-
+import combatgroup
 #from sqliteutils import conn_execute, DurationManager
 from sqliteutils import *
 
@@ -137,14 +137,38 @@ CastRun() # This sets up the dict of runners so that we don't have to call them 
 class AuraRun(DataRun):
     def __init__(self):
         DataRun.__init__(self, ['CombatRun'], ['aura'])
+        self.version = datetime.datetime.now()
         
     def impl(self, options):
-        print datetime.datetime.now(), "Calculating auras..."
-        
         for combat in conn_execute(self.conn, '''select * from combat order by start_event_id''').fetchall():
-            aura_manager = DurationManager(self.conn, 'aura', [('combat_id', 'int'), ('destType', 'str'), ('destName', 'str'), ('spellName', 'str'), ('spellId', 'str')], [('sourceType', 'str'), ('sourceName', 'str')])
+            aura_manager = DurationManager(self.conn, 'aura', [('combat_id', 'int'), ('spellName', 'str'), ('destType', 'str'), ('destName', 'str'), ('spellId', 'str')], [('sourceType', 'str'), ('sourceName', 'str')])
             
-            for event in basicparse.getEventData(self.conn, orderBy='id', suffix=('_AURA_APPLIED', '_AURA_REMOVED')).fetchall():
+            cast_set = set([x['spellName'] for x in basicparse.getEventData(self.conn, 'distinct spellName', combat_id=combat['id'], suffix='_CAST_SUCCESS').fetchall()])
+            
+            event_list = []
+            lastSpell_str = None
+            for event in basicparse.getEventData(self.conn, orderBy='id', suffix=('_AURA_APPLIED', '_AURA_REMOVED'), spellName=tuple(cast_set)).fetchall():
+                #if event_list and lastSpell_str and event['spellName'] != lastSpell_str:
+                #    if len(event_list) < 6: or '_CAST_SUCCESS' in [x['suffix'] for x in event_list]:
+                #        for old_event in event_list:
+                #            if old_event['eventType'] == 'SPELL_AURA_APPLIED':
+                #                aura_manager.add(old_event)
+                #    
+                #
+                #if event['eventType'] == 'SPELL_AURA_REMOVED':
+                #    aura_manager.remove(event)
+                #if event_list and event_list[-1]['spellName'] != event['spellName']:
+                #    # This wonky bit is to screen out raid-wide auras from procs.  Too many inserts, and generally not interesting.
+                #    if len(event_list) < 6 or '_CAST_SUCCESS' in [x['suffix'] for x in event_list]:
+                #        for old_event in event_list:
+                #            if old_event['eventType'] == 'SPELL_AURA_APPLIED':
+                #                aura_manager.add(old_event)
+                #            #elif old_event['eventType'] == 'SPELL_AURA_REMOVED':
+                #            #    aura_manager.remove(old_event)
+                #    event_list = [event]
+                #else:
+                #    event_list.append(event)
+
                 if event['eventType'] == 'SPELL_AURA_APPLIED':
                     aura_manager.add(event)
                 elif event['eventType'] == 'SPELL_AURA_REMOVED':
