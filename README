@@ -51,28 +51,27 @@ Options:
   --profile=FILE  Use cProfile to profile the application while running; save
                   data to FILE.
 
-    
-$ ./wowspi activitygraph --help
-Usage: wowspi activitygraph [options]
+$ ./wowspi activitygraph.GraphRun --help
+Usage: wowspi activitygraph.GraphRun [options]
 
 Options:
   -h, --help        show this help message and exit
-  --css=NAME        Use color settings from etc/css.NAME.json to render
-                    images.
-  --force           Force reparsing from scratch.
+  --stasisbin=PATH  Path to (Apo)StasisCL executable; will run stasis into
+                    --stasisout.
+  --stasisout=PATH  Path to base dir for (Apo)StasisCL parses.
   --date=DATE       Use DATE for standard log files and db names.  Overrides
                     --db and --log.
-  --db=OUTPUT       Desired sqlite database output file name.
   --log=LOGFILE     Path to the WoWCombatLog.txt file.
-  -v, --verbose     Print more output; may include debugging information not
-                    intended for end-users.
   --armorydb=DB     Desired sqlite database output file name.
   --realm=REALM     Realm to use for armory data queries.
   --region=REGION   Region to use for armory data queries (www, eu, kr, cn,
                     tw).
-  --stasisbin=PATH  Path to (Apo)StasisCL executable; will run stasis into
-                    --stasisout.
-  --stasisout=PATH  Path to base dir for (Apo)StasisCL parses.
+  --css=NAME        Use color settings from etc/css.NAME.json to render
+                    images.
+  --db=OUTPUT       Desired sqlite database output file name.
+  --force           Force reparsing from scratch.
+  -v, --verbose     Print more output; may include debugging information not
+                    intended for end-users.
         
 
 In general, wowspi will attempt to not repeat steps in the processing chain
