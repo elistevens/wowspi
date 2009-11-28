@@ -183,29 +183,34 @@ class StasisRun(DataRun):
     def impl(self, options):
         if not os.path.exists(options.stasis_path):
             os.mkdir(options.stasis_path)
-        cmd_list = [os.path.join(options.bin_path, 'stasis'), 'add', '-dir', options.stasis_path, '-file', options.log_path, '-server', options.realm_str, '-attempt', '-overall', '-combine', '-nav']
-    
-        env_dict = copy.deepcopy(os.environ)
-        if 'PERL5LIB' in env_dict:
-            env_dict['PERL5LIB'] += (':%s' % os.path.join(options.bin_path, 'lib'))
-        else:
-            env_dict['PERL5LIB'] = os.path.join(options.bin_path, 'lib')
+            
+        if options.bin_path:
+            cmd_list = [os.path.join(options.bin_path, 'stasis'), 'add', '-dir', options.stasis_path, '-file', options.log_path, '-server', options.realm_str, '-attempt', '-overall', '-combine', '-nav']
         
-        subprocess.call(cmd_list, env=env_dict)
-        
-        subprocess.call(['cp', '-r', os.path.join(options.bin_path, 'extras'), options.stasis_path])
-        
-        css_str = file(os.path.join(options.bin_path, 'extras', 'sws2.css')).read()
-        new_str = '''.swsmaster div.tabContainer {
+            env_dict = copy.deepcopy(os.environ)
+            if 'PERL5LIB' in env_dict:
+                env_dict['PERL5LIB'] += (':%s' % os.path.join(options.bin_path, 'lib'))
+            else:
+                env_dict['PERL5LIB'] = os.path.join(options.bin_path, 'lib')
+            
+            subprocess.call(cmd_list, env=env_dict)
+            
+            subprocess.call(['cp', '-r', os.path.join(options.bin_path, 'extras'), options.stasis_path])
+            
+            css_str = file(os.path.join(options.bin_path, 'extras', 'sws2.css')).read()
+            new_str = '''.swsmaster div.tabContainer {
     text-align: center;
 }
     
 .swsmaster div.tabContainer div.tabBar, .swsmaster div.tabContainer div.tab table {'''
     
-        if new_str not in css_str:
-            css_str = css_str.replace('''.swsmaster div.tabContainer {''', new_str)
-            file(os.path.join(options.stasis_path, 'extras', 'sws2.css'), 'w').write(css_str)
-        subprocess.call(['rm', '-rf', os.path.join(options.stasis_path, 'extras', '.svn')])
+            if new_str not in css_str:
+                css_str = css_str.replace('''.swsmaster div.tabContainer {''', new_str)
+                file(os.path.join(options.stasis_path, 'extras', 'sws2.css'), 'w').write(css_str)
+            subprocess.call(['rm', '-rf', os.path.join(options.stasis_path, 'extras', '.svn')])
+        else:
+            print datetime.datetime.now(), "--stasisbin not given; skipping."
+            self.version = datetime.datetime.now()
     
     def usage_setup(self, parser, **kwargs):
         if kwargs.get('stasisbin', True):

@@ -248,7 +248,7 @@ class LogCombat(object):
 class CombatRun(DataRun):
     def __init__(self):
         DataRun.__init__(self, ['ParseRun', 'FakeDeathRun'], ['combat'])
-        self.version = datetime.datetime.now()
+        #self.version = datetime.datetime.now()
         
     def impl(self, options):
         basicparse.sqlite_insureColumns(self.conn, 'event', [('combat_id', 'int'), #('segment_id', 'int'), 

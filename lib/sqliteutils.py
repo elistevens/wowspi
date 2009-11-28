@@ -211,15 +211,18 @@ class DataRun(object):
         full_list = []
         
         for prereq_str in self.prereq_list:
-            full_list.append(self.runner_dict[prereq_str])
-            full_list.extend(self.runner_dict[prereq_str].getAllPrereqs())
+            full_list[0:0] = self.runner_dict[prereq_str].getAllPrereqs() + [self.runner_dict[prereq_str]]
+            #full_list.extend()
+            
+        #print self.name, "full", [x.name for x in full_list]
                 
         ret_list = []
-        full_list.reverse()
+        #full_list.reverse()
         for prereq in full_list:
             if prereq not in ret_list:
                 ret_list.append(prereq)
                 
+        #print self.name, "ret", [x.name for x in ret_list]
         return ret_list
         
     def main(self, sys_argv):

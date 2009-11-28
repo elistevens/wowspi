@@ -137,7 +137,7 @@ CastRun() # This sets up the dict of runners so that we don't have to call them 
 class AuraRun(DataRun):
     def __init__(self):
         DataRun.__init__(self, ['CombatRun'], ['aura'])
-        self.version = datetime.datetime.now()
+        #self.version = datetime.datetime.now()
         
     def impl(self, options):
         for combat in conn_execute(self.conn, '''select * from combat order by start_event_id''').fetchall():

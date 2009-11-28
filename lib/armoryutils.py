@@ -127,7 +127,7 @@ def dict_scrapeCharacter(name_str, realm_str, region_str):
         opener = urllib2.build_opener()
         opener.addheaders = [('User-agent', 'Mozilla/5.0 (Macintosh; U; Intel Mac OS X; en-US; rv:1.8.1.6) Gecko/20070725 Firefox/2.0.0.6')]
         
-        time.sleep(5)
+        time.sleep(1)
         xml_str = opener.open("http://%s.wowarmory.com/character-sheet.xml?r=%s&n=%s" % (region_str, realm_str, name_str)).read()
         armory_xml = xml.etree.ElementTree.XML(xml_str)
         
