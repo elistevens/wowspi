@@ -51,6 +51,7 @@ class WipeRun(DataRun):
         sqlite_insureColumns(self.conn, 'event', [('wipe', 'int default 0')])
 
         for combat in conn_execute(self.conn, '''select * from combat order by start_event_id''').fetchall():
+            print datetime.datetime.now(), "Combat %d: %s - %s" % (combat['id'], combat['instance'], combat['encounter'])
             conn_execute(self.conn, '''update event set wipe = 0 where id >= ? and id <= ?''', (combat['start_event_id'], combat['end_event_id']))
                 
             # Note: the limit 3 means we actually get the 3rd-to-last heal.
@@ -78,41 +79,124 @@ class WoundRun(DataRun):
         DataRun.__init__(self, ['CombatRun', 'FakeDeathRun'], ['wound'])
         
     def impl(self, options):
+        wound_manager = DurationManager(self.conn, 'wound', [('combat_id', 'int'), ('destType', 'str'), ('destName', 'str')], [('amount', 'int default 0'), ('delta', 'int default 0'), ('direction', 'int default 0'), ('dead', 'int default 0'), ('spellName', 'str')])
+        
+        count = 1
         for combat in conn_execute(self.conn, '''select * from combat order by start_event_id''').fetchall():
-            wound_manager = DurationManager(self.conn, 'wound', [('combat_id', 'int'), ('destType', 'str'), ('destName', 'str')], [('amount', 'int default 0'), ('direction', 'int default 0'), ('dead', 'int default 0')])
+            print datetime.datetime.now(), "Combat %d: %s - %s" % (combat['id'], combat['instance'], combat['encounter'])
             
+            hot_dict = collections.defaultdict(int)
+            #for event in basicparse.getEventData(self.conn, orderBy='id', destType='PC', suffix=('_DAMAGE', '_HEAL', '_DIED', '_RESURRECT'), fetchall=True):#.fetchall():
             for event in basicparse.getEventData(self.conn, orderBy='id', destType='PC', suffix=('_DAMAGE', '_HEAL', '_DIED', '_RESURRECT')).fetchall():
+                
                 if event['destType'] == 'PC':
+                    key = wound_manager.eventKey(event)
+                    direction = 0
+                    
+                    
                     if event['suffix'] == '_DAMAGE' and event['amount'] > 0:
-                        wound = wound_manager.get(event, value=(0, 0, 0))
-                        wound_manager.add(event, value=(wound['amount'] + event['amount'] - event['extra'], -1, 0))
+                        direction = -1
+                        hot_dict[key] -= event['amount'] + event['extra']
+                        #wound = wound_manager.get(event, value=(0, 0, 0, 0, ''))
+                        #wound_manager.add(event, value=(wound['amount'] + event['amount'] - event['extra'] + hot_dict[key], -event['amount'] + event['extra'], -1, 0, event['spellName']))
+                        #hot_dict[key] = 0
 
-                    elif event['suffix'] == '_HEAL' and event['amount'] > 0:
+                    elif event['suffix'] == '_HEAL' and event['amount'] - event['extra'] > 0: # and (event['amount'] - event['extra'] > 2000 or event['extra'] > 0):
                         # We don't set direction=1 on HOTs because we only
                         # want direction to track actions, not automatic
                         # effects.  We should probably also screen out spells
                         # like Earth Shield.  FIXME
-                        if event['prefix'] == 'SPELL_PERIODIC':
-                            direction = 0
-                        else:
+                        if event['prefix'] == 'SPELL':
                             direction = 1
                             
                         if event['extra'] > 0:
-                            wound_manager.add(event, value=(0, direction, 0))
+                            wound = wound_manager.get(event, value=(0, 0, 0, 0, ''))
+                            if wound['amount'] < 0:
+                                wound_manager.add(event, value=(0, event['amount'] - event['extra'], direction, 0, event['spellName']))
+                            hot_dict[key] = 0
                         else:
-                            wound = wound_manager.get(event, value=(0, 0, 0))
-                            wound_manager.add(event, value=(wound['amount'] - event['amount'], direction, 0))
+                            hot_dict[key] += event['amount'] - event['extra']
+                        #    wound = wound_manager.get(event, value=(0, 0, 0, 0, ''))
+                        #    wound_manager.add(event, value=(wound['amount'] - event['amount'] - hot_dict[key], event['amount'] - event['extra'], direction, 0, event['spellName']))
+                        #hot_dict[key] = 0
 
+                    #elif event['suffix'] == '_HEAL' and event['amount'] - event['extra'] > 0:
+                    #    hot_dict[key] += event['amount'] - event['extra']
+                        
                     elif event['suffix'] == '_DIED' and event['fakeDeath'] != 1:
-                        wound_manager.add(event, value=(0, -1, 1))
+                        wound_manager.add(event, value=(0, 0, -1, 1, event['spellName']))
+                        hot_dict[key] = 0
                         
                     elif event['suffix'] == '_RESURRECT':
-                        wound_manager.add(event, value=(0, 1, 0))
-                        #wound_manager.remove(event)
+                        wound_manager.add(event, value=(0, 0, 1, 0, event['spellName']))
+                        hot_dict[key] = 0
                         
+                    #if event['destName'] == 'Naxxar':
+                    #    print key, hot_dict[key], event['spellName'], event['time']
+                        
+                    try:
+                        if hot_dict[key] < -2000 or hot_dict[key] > 2000:
+                            wound = wound_manager.get(event, value=(0, 0, 0, 0, ''))
+                            wound_manager.add(event, value=(wound['amount'] + hot_dict[key], (direction or 1) * (event['amount'] - event['extra']), direction, 0, event['spellName']))
+                            hot_dict[key] = 0
+                    except:
+                        #for k in event.keys():
+                        #    print k, '\t', event[k]
+                        #print key, hot_dict[key]
+                        raise
+                        
+
+
+                #if event['destType'] == 'PC':
+                #    if event['suffix'] == '_DAMAGE' and event['amount'] > 0:
+                #        wound = wound_manager.get(event, value=(0, 0, 0, 0, ''))
+                #        wound_manager.add(event, value=(wound['amount'] + event['amount'] - event['extra'] + hot_dict[wound_manager.eventKey(event)], -event['amount'] + event['extra'], -1, 0, event['spellName']))
+                #        hot_dict[wound_manager.eventKey(event)] = 0
+                #
+                #    elif event['suffix'] == '_HEAL' and event['amount'] - event['extra'] > 0 and (event['amount'] - event['extra'] > 2000 or event['extra'] > 0):
+                #        # We don't set direction=1 on HOTs because we only
+                #        # want direction to track actions, not automatic
+                #        # effects.  We should probably also screen out spells
+                #        # like Earth Shield.  FIXME
+                #        if event['prefix'] == 'SPELL_PERIODIC':
+                #            direction = 0
+                #        else:
+                #            direction = 1
+                #            
+                #        if event['extra'] > 0:
+                #            wound_manager.add(event, value=(0, event['amount'] - event['extra'], direction, 0, event['spellName']))
+                #        else:
+                #            wound = wound_manager.get(event, value=(0, 0, 0, 0, ''))
+                #            wound_manager.add(event, value=(wound['amount'] - event['amount'] - hot_dict[wound_manager.eventKey(event)], event['amount'] - event['extra'], direction, 0, event['spellName']))
+                #        hot_dict[wound_manager.eventKey(event)] = 0
+                #
+                #    elif event['suffix'] == '_HEAL' and event['amount'] - event['extra'] > 0:
+                #        hot_dict[wound_manager.eventKey(event)] += event['amount'] - event['extra']
+                #        
+                #    elif event['suffix'] == '_DIED' and event['fakeDeath'] != 1:
+                #        wound_manager.add(event, value=(0, 0, -1, 1, event['spellName']))
+                #        hot_dict[wound_manager.eventKey(event)] = 0
+                #        
+                #    elif event['suffix'] == '_RESURRECT':
+                #        wound_manager.add(event, value=(0, 0, 1, 0, event['spellName']))
+                #        hot_dict[wound_manager.eventKey(event)] = 0
+                        
+                #self.conn.commit()
+                        
+                        
+                #count += 1
+                #if count % 200 == 0:
+                #    self.conn.commit()
+                
             event = basicparse.getEventData(self.conn, id=combat['end_event_id']).fetchone()
             wound_manager.close(event)
+            
+            #if combat['id'] > 3:
+            #    break
+            #self.conn.commit()
+        #wound_manager.index()
 WoundRun() # This sets up the dict of runners so that we don't have to call them in __init__
+
 
 
 class CastRun(DataRun):
@@ -121,6 +205,7 @@ class CastRun(DataRun):
         
     def impl(self, options):
         for combat in conn_execute(self.conn, '''select * from combat order by start_event_id''').fetchall():
+            print datetime.datetime.now(), "Combat %d: %s - %s" % (combat['id'], combat['instance'], combat['encounter'])
             cast_manager = DurationManager(self.conn, 'cast', [('combat_id', 'int'), ('sourceType', 'str'), ('sourceName', 'str')], [('spellName', 'str'), ('spellId', 'int'), ('destType', 'str'), ('destName', 'str')])
             
             for event in basicparse.getEventData(self.conn, orderBy='id', suffix=('_CAST_START', '_CAST_SUCCESS', '_CAST_FAILED')).fetchall():
@@ -141,6 +226,7 @@ class AuraRun(DataRun):
         
     def impl(self, options):
         for combat in conn_execute(self.conn, '''select * from combat order by start_event_id''').fetchall():
+            print datetime.datetime.now(), "Combat %d: %s - %s" % (combat['id'], combat['instance'], combat['encounter'])
             aura_manager = DurationManager(self.conn, 'aura', [('combat_id', 'int'), ('spellName', 'str'), ('destType', 'str'), ('destName', 'str'), ('spellId', 'str')], [('sourceType', 'str'), ('sourceName', 'str')])
             
             cast_set = set([x['spellName'] for x in basicparse.getEventData(self.conn, 'distinct spellName', combat_id=combat['id'], suffix='_CAST_SUCCESS').fetchall()])

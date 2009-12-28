@@ -94,40 +94,64 @@ def pretty(x):
         return "%0.4f" % x
     return str(x)
     
-def report(conn, options):
-    print options
     
-    details_file = file(os.path.join(options.stasis_path, 'execution_details.tsv'), 'w')
-    
-    needsHeader = True
-    header_list = ['combat_id','date_str','size','type','instance','encounter','typeName','normalizedValue','toonName','value']
-    print >>details_file, '\t'.join([str(x) for x in header_list])
-    
-    toon_set = set()
-    for row in conn_execute(conn, '''select * from combat join execution on (combat.id = execution.combat_id) order by instance, encounter, typeName, value desc'''):
-        try:
-            print >>details_file, '\t'.join([pretty(row[x]) for x in header_list])
-            toon_set.add(row['toonName'])
-        except IndexError, e:
-            print 'Error:', e, x
-            raise
-
-    final_list = []
-    for toonName in toon_set:
-        fail_count = conn_execute(conn, '''select count(*) from execution where type = ? and toonName = ?''', ('fail', toonName)).fetchone()[0]
-        final_count = int(math.ceil(fail_count * 0.5))
+class ReportRun(DataRun):
+    def __init__(self):
+        DataRun.__init__(self, ['ExecutionRun'], [])
+        self.version = datetime.datetime.now()
         
-        value_avg = 0
-        if final_count > 0:
-            value_avg = sum([row['normalizedValue'] for row in conn_execute(conn, '''select * from execution where type = ? and toonName = ? order by normalizedValue desc limit ?''', ('fail', toonName, final_count))]) / final_count
-            
-        final_list.append((value_avg, toonName))
+    def impl(self, options):
+        conn = self.conn
+        
+        execution_conn = sqlite_connection(os.path.join('data', 'reports', 'execution.db'))
+        
+        date_str = conn_execute(conn, '''select date_str from execution limit 1''').fetchone()[0]
+        
+        header_list = ['combat_id','date_str','size','type','instance','encounter','typeName','normalizedValue','toonName','value']
+        
+        conn_execute(execution_conn, '''create table if not exists execution (id integer primary key, date_str str, type str, combat_id int, size int, instance str, encounter str, typeName str, toonName str, value float default 0.0, normalizedValue float default 0.0)''' )
+        conn_execute(execution_conn, '''delete from execution where date_str = ?''' , (date_str,))
+        
+        #toon_set = set()
+        for row in conn_execute(conn, '''select * from combat join execution on (combat.id = execution.combat_id) order by instance, encounter, typeName, value desc'''):
+            value_list = []
+            for col_str in header_list:
+                value_list.append(row[col_str])
+                
+            conn_execute(execution_conn, '''insert into execution (%s) values (%s)''' % (','.join(header_list), ','.join(['?' for x in header_list])), tuple(value_list))
+        execution_conn.commit()
 
+
+        if hasattr(options, 'stasis_path'):
+            details_file = file(os.path.join(options.stasis_path, 'execution_details.tsv'), 'w')
+            print >>details_file, '\t'.join([str(x) for x in header_list])
+
+
+            for row in conn_execute(conn, '''select * from combat join execution on (combat.id = execution.combat_id) order by instance, encounter, typeName, value desc'''):
+                print >>details_file, '\t'.join([pretty(row[x]) for x in header_list])
+            
+            
+        fail_list = conn_execute(execution_conn,
+                '''select max(normalizedValue) normalizedValue, toonName from execution where type = ? and date_str > ? and typeName not in ('Fel Lightning') group by date_str, instance, encounter, typeName, toonName''',
+                ('fail', (datetime.datetime.now() - datetime.timedelta(182)).strftime('%Y-%m-%d'))).fetchall()
+        constructBuckets(fail_list)
     
-    overall_file = file(os.path.join(options.stasis_path, 'execution_overall.tsv'), 'w')
-    print >>overall_file, '\t'.join(['toonName', 'avgValue'])
-    for t in sorted(final_list):
-        print >>overall_file, '\t'.join([pretty(x) for x in t])
+        #final_list = []
+        #for toonName in toon_set:
+        #    fail_count = conn_execute(conn, '''select count(*) from execution where type = ? and toonName = ?''', ('fail', toonName)).fetchone()[0]
+        #    final_count = int(math.ceil(fail_count * 0.5))
+        #    
+        #    value_avg = 0
+        #    if final_count > 0:
+        #        value_avg = sum([row['normalizedValue'] for row in conn_execute(conn, '''select * from execution where type = ? and toonName = ? order by normalizedValue desc limit ?''', ('fail', toonName, final_count))]) / final_count
+        #        
+        #    final_list.append((value_avg, toonName))
+        #
+        #
+        #overall_file = file(os.path.join(options.stasis_path, 'execution_overall.tsv'), 'w')
+        #print >>overall_file, '\t'.join(['toonName', 'avgValue'])
+        #for t in sorted(final_list):
+        #    print >>overall_file, '\t'.join([pretty(x) for x in t])
 
 
 t2f_dict = {}
@@ -161,6 +185,92 @@ def pall(cutoff=0.5):
     ret_list = sorted(final_dict.items(), key=lambda x: x[1])
     for x in ret_list:
         print "%12s" % x[0], '\t', x[1]
+
+def rflist(l):
+    return "[%s]" % ", ".join(["%.2f" %x for x in l])
+
+def constructBuckets(fail_list):
+    print len(fail_list)
+    bucketSize_int = 20
+    #bucketFraction_float = 1
+    bucketMultiple_int = 2
+    
+    fail_dict = collections.defaultdict(list)
+    
+    for fail_row in fail_list:
+        fail_dict[fail_row['toonName']].append(fail_row['normalizedValue'])
+    print 'Tantryst', len(fail_dict['Tantryst']), rflist(sorted(fail_dict['Tantryst'], reverse=True))
+    print 'Kosmo   ', len(fail_dict['Kosmo']), rflist(sorted(fail_dict['Kosmo'], reverse=True))
+        
+    bucketed_dict = {}
+    min_list = [1.0] * bucketSize_int
+    max_list = [0.0] * bucketSize_int
+    for name_str, full_list in fail_dict.items():
+        if len(full_list) < bucketSize_int * bucketMultiple_int:
+            #print "Skipping:", name_str, len(full_list)
+            continue
+        
+        full_list.sort(reverse=True)
+        #full_list = full_list[0:int(len(full_list)*bucketFraction_float)]
+        
+        bucketed_dict[name_str] = full_list[0:-1:len(full_list)/bucketSize_int]
+        
+        min_list = [min(x, y) for x, y in itertools.izip(min_list, bucketed_dict[name_str])]
+        max_list = [max(x, y) for x, y in itertools.izip(max_list, bucketed_dict[name_str])]
+        
+    minmax_list = [list() for x in range(bucketSize_int)]
+    for name_str, bucket_list in bucketed_dict.items():
+        for sub_list, x in itertools.izip(minmax_list, bucket_list):
+            sub_list.append(x)
+            
+    for sub_list in minmax_list:
+        sub_list.sort()
+        
+    #min_list = [sub_list[1] for sub_list in minmax_list]
+    #max_list = [sub_list[-2] for sub_list in minmax_list]
+    #min_list = [sub_list[int(len(sub_list) * 0.1)] for sub_list in minmax_list]
+    min_list = [sub_list[0] for sub_list in minmax_list]
+    max_list = [sub_list[int(len(sub_list) * 1.0 - 1)] for sub_list in minmax_list]
+    
+        
+    print rflist(min_list)
+    print rflist(max_list)
+    #print bucketed_dict
+    
+    #def normalize(x, min_x, max_x):
+    #    return x
+    
+    def normalize(x, min_x, max_x):
+        if x < min_x:
+            return 0.0
+        #if min_x == 1.0:
+        #    return 1.0
+        if x > max_x:
+            return 1.0
+        
+        return (x - min_x * 0.9) / (1 - min_x * 0.9) ** 0.5
+        #return ((x-min_x) / (1-min_x)) #** 0.5
+        
+    normalized_dict = {}
+    for name_str, bucket_list in bucketed_dict.items():
+        #normalized_dict[name_str] = [(x-min_x)/(max_x-min_x or 1) for x, min_x, max_x in itertools.izip(bucket_list, min_list, max_list)]
+        #normalized_dict[name_str] = [(x-min_x) if (x-min_x) >= 0.0 else 0.0 for x, min_x, max_x in itertools.izip(bucket_list, min_list, max_list)]
+        #normalized_dict[name_str] = [(x-min_x) ** 0.5 if (x-min_x) >= 0.0 else 0.0 for x, min_x, max_x in itertools.izip(bucket_list, min_list, max_list)]
+        normalized_dict[name_str] = [normalize(x, min_x, max_x) for x, min_x, max_x in itertools.izip(bucket_list, min_list, max_list)]
+        #normalized_dict[name_str] = bucket_list
+    #print normalized_dict
+        
+    final_dict = {}
+    for name_str, normalized_list in normalized_dict.items():
+        final_dict[name_str] = sum(normalized_list) / len(normalized_list)
+    #print final_dict
+    
+    for name_str, final_float in sorted(final_dict.items(), key=lambda x: (x[1], x[0])):
+        print "%12s" % name_str, "%.4f" % final_float, rflist(bucketed_dict[name_str][:10]), '\t', rflist(normalized_dict[name_str][:10])
+        
+    return final_dict
+    
+    
 
 def main(sys_argv, options, arguments):
     try:

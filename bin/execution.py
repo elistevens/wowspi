@@ -276,7 +276,7 @@ def clumpDebuff(conn, combat, debuffSpellId, ignoredTargets=2, **kwargs):
 
 class ExecutionRun(DataRun):
     def __init__(self):
-        DataRun.__init__(self, ['CombatRun'], ['execution'])
+        DataRun.__init__(self, ['CombatRun', 'WipeRun'], ['execution'])
         
     def impl(self, options):
         conn = self.conn
@@ -289,8 +289,9 @@ class ExecutionRun(DataRun):
         overall_dict = {}
         date_str = None
         
-        print datetime.datetime.now(), "Iterating over combats (finding execution failures)..."
+        #print datetime.datetime.now(), "Iterating over combats (finding execution failures)..."
         for combat in conn_execute(conn, '''select * from combat order by start_event_id''').fetchall():
+            print datetime.datetime.now(), "Combat %d: %s - %s" % (combat['id'], combat['instance'], combat['encounter'])
             start_dt = conn_execute(conn, '''select time from event where id = ?''', (combat['start_event_id'],)).fetchone()[0]
             end_dt = conn_execute(conn, '''select time from event where id = ?''', (combat['end_event_id'],)).fetchone()[0]
             
@@ -325,7 +326,6 @@ ExecutionRun()
 
 
 if __name__ == "__main__":
-    options, arguments = usage(sys.argv[1:])
-    sys.exit(main(sys.argv[1:], options, arguments) or 0)
+    ExecutionRun().main(sys.argv[1:])
     
 # eof

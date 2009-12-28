@@ -393,7 +393,7 @@ def parseLog(conn, log_path):
     conn.commit()
 
 
-def getEventData(conn, select_str='*', where_list=None, orderBy=None, **kwargs):
+def getEventData(conn, select_str='*', where_list=None, orderBy=None, fetchall=False, **kwargs):
     """
     Examples of use:
         Total healing done to PCs:
@@ -432,8 +432,11 @@ def getEventData(conn, select_str='*', where_list=None, orderBy=None, **kwargs):
         orderBy = ' order by ' + orderBy
     else:
         orderBy = ''
-        
-    return conn_execute(conn, ('''select %s from event where ''' % select_str) + ' and '.join(sql_list) + orderBy, tuple(arg_list))
+    
+    if fetchall:
+        return conn_execute_fetchall(conn, ('''select %s from event where ''' % select_str) + ' and '.join(sql_list) + orderBy, tuple(arg_list))
+    else:
+        return conn_execute(conn, ('''select %s from event where ''' % select_str) + ' and '.join(sql_list) + orderBy, tuple(arg_list))
 
 
 class ParseRun(DataRun):

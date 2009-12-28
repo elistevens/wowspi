@@ -26,6 +26,8 @@ import collections
 #import csv
 import datetime
 #import glob
+import hashlib
+import inspect
 #import itertools
 #import json
 import optparse
@@ -68,10 +70,16 @@ import sys
 #            )
 
 
-def sqlite_connection(options):
-    conn = sqlite3.connect(options.db_path, detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES)
+def sqlite_connection(db_path):
+    conn = sqlite3.connect(db_path, detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES)
+    #conn = sqlite3.connect(':memory:', detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES)
     conn.row_factory = sqlite3.Row
     
+    conn.execute('''PRAGMA synchronous = OFF''')
+    #conn.execute('''PRAGMA temp_store = 2''')
+    conn.execute('''PRAGMA locking_mode = EXCLUSIVE''')
+    conn.execute('''PRAGMA journal_mode = OFF''')
+
     return conn
     
 def sqlite_insureColumns(conn, table_str, column_list):
@@ -85,6 +93,7 @@ def sqlite_insureColumns(conn, table_str, column_list):
 _count_dict = collections.defaultdict(int)
 _time_dict = collections.defaultdict(datetime.timedelta)
 _max_dict = collections.defaultdict(datetime.timedelta)
+_max_td = datetime.timedelta(seconds=5)
 def conn_execute(conn, sql_str, values_tup=None, many=False):
     if sql_str.startswith('insert into event'):
         key_str = 'insert into event'
@@ -112,6 +121,98 @@ def conn_execute(conn, sql_str, values_tup=None, many=False):
         _time_dict[key_str] += td
         _max_dict[key_str] = max(td, _max_dict[key_str])
         
+        if td > _max_td:
+            print n, "Slow query:", td, sql_str 
+
+
+def conn_execute_fetchall(conn, sql_str, values_tup=None):
+    #if sql_str.startswith('insert into event'):
+    #    key_str = 'insert into event'
+    #else:
+    #    key_str = sql_str
+    #
+    #_count_dict[key_str] += 1
+    #
+    #n = datetime.datetime.now()
+    
+    try:
+        cur = conn.cursor()
+        if values_tup is not None:
+            cur.execute(sql_str, values_tup)
+        else:
+            cur.execute(sql_str)
+        ret_list = cur.fetchmany(1000)
+        del cur
+        offset_int = len(ret_list)
+        
+        #print offset_int
+
+        while ret_list:
+            yield ret_list.pop(0)
+            
+            if not ret_list:
+                cur = conn.cursor()
+                if values_tup is not None:
+                    cur.execute(sql_str + ' limit 1000 offset %s' % offset_int, values_tup)
+                else:
+                    cur.execute(sql_str + ' limit 1000 offset %s' % offset_int)
+                ret_list = cur.fetchmany(1000)
+                del cur
+                offset_int += len(ret_list)
+    except:
+        print sql_str
+        print repr(values_tup)[:1000]
+        raise
+    #finally:
+    #    td = datetime.datetime.now() - n
+    #    _time_dict[key_str] += td
+    #    _max_dict[key_str] = max(td, _max_dict[key_str])
+    #    
+    #    if td > _max_td:
+    #        print n, "Slow query:", td, sql_str 
+
+
+
+
+        #cur = self.conn.cursor()
+        #cur.execute('''select * from event order by id''')
+        #ret_list = cur.fetchmany()
+        #
+        ## This loop is structured oddly so that we don't have to pull in all
+        ## of the event list into memory at once.  Otherwise, four hours of
+        ## tens raiding would consume about 400MB of RAM, and that won't work
+        ## for hosted solutions.
+        ## Note that combat.finalizeClose has to mess with the DB, so we can't
+        ## have statements in progress while we fiddle with it.
+        #while ret_list:
+        #    yield ret_list.pop(0)
+        #
+        #    if not combat:
+        #        combat = LogCombat(event)
+        #    elif combat.isOpen():
+        #        combat.addEvent(event)
+        #    else:
+        #        del cur
+        #        
+        #        if combat.prune(require_set):
+        #            combat.finalizeClose(self.conn, require_set)
+        #            self.conn.commit()
+        #            
+        #        del combat
+        #        combat = None
+        #            
+        #        cur = self.conn.cursor()
+        #        cur.execute('''select * from event where id >= ? order by id''', (event['id'],))
+        #        ret_list = []
+        #        
+        #    if not ret_list:
+        #        ret_list = cur.fetchmany()
+        #        
+        #del cur
+
+
+
+
 
 def sqlite_print_perf(verbose=True):
     if verbose:
@@ -133,18 +234,23 @@ class DurationManager(object):
 
         self.current_dict = {}
         
-        conn_execute(self.conn, '''create table if not exists %s (id integer primary key, start_event_id integer default null, end_event_id integer default null, start_time timestamp, end_time timestamp, %s)''' %
+        #conn_execute(self.conn, '''create table if not exists %s (id integer primary key, start_event_id integer default null, end_event_id integer default null, start_time timestamp, end_time timestamp, %s)''' %
+        #        (self.table_str, ','.join(["%s %s" % x for x in self.key_list + self.value_list])))
+        conn_execute(self.conn, '''create table if not exists %s (id integer primary key, start_event_id integer default null, end_event_id integer default null, %s)''' %
                 (self.table_str, ','.join(["%s %s" % x for x in self.key_list + self.value_list])))
         conn_execute(self.conn, '''create index if not exists ndx_%s_event on %s (start_event_id, end_event_id, %s)''' %
                 (self.table_str, self.table_str, ','.join([x[0] for x in self.key_list])))
-        conn_execute(self.conn, '''create index if not exists ndx_%s_time on %s (start_time, end_time, %s)''' %
-                (self.table_str, self.table_str, ','.join([x[0] for x in self.key_list])))
-        conn_execute(self.conn, '''create index if not exists ndx_%s_key on %s (%s, start_time, end_time)''' %
+        #conn_execute(self.conn, '''create index if not exists ndx_%s_time on %s (start_time, end_time, %s)''' %
+        #        (self.table_str, self.table_str, ','.join([x[0] for x in self.key_list])))
+        #conn_execute(self.conn, '''create index if not exists ndx_%s_key on %s (%s, start_time, end_time)''' %
+        #        (self.table_str, self.table_str, ','.join([x[0] for x in self.key_list])))
+        conn_execute(self.conn, '''create index if not exists ndx_%s_key on %s (%s, start_event_id, end_event_id)''' %
                 (self.table_str, self.table_str, ','.join([x[0] for x in self.key_list])))
         
         col_str = ','.join([x[0] for x in self.key_list + self.value_list])
         qmk_str = ','.join(['?' for x in self.key_list + self.value_list])
-        self.insert_str = '''insert into %s (start_event_id, start_time, %s) values (?, ?, %s)''' % (self.table_str, col_str, qmk_str)
+        #self.insert_str = '''insert into %s (start_event_id, start_time, %s) values (?, ?, %s)''' % (self.table_str, col_str, qmk_str)
+        self.insert_str = '''insert into %s (start_event_id, end_event_id, %s) values (?, ?, %s)''' % (self.table_str, col_str, qmk_str)
 
     def eventKey(self, event):
         return tuple([event[x[0]] for x in self.key_list])
@@ -159,16 +265,18 @@ class DurationManager(object):
             value = self.eventValue(event)
 
         if key in self.current_dict:
-            self.remove(key, event)
+            self.remove(event, key)
             
-        self.current_dict[key] = conn_execute(self.conn, self.insert_str, (event['id'], event['time']) + key + value).lastrowid
+        #self.current_dict[key] = conn_execute(self.conn, self.insert_str, (event['id'], event['time']) + key + value).lastrowid
+        self.current_dict[key] = conn_execute(self.conn, self.insert_str, (event['id'], event['id']) + key + value).lastrowid
         
     def remove(self, event, key=None):
         if key is None:
             key = self.eventKey(event)
             
         if key in self.current_dict:
-            conn_execute(self.conn, '''update %s set end_event_id = ?, end_time = ? where id = ?''' % self.table_str, (event['id'], event['time'], self.current_dict[key]))
+            #conn_execute(self.conn, '''update %s set end_event_id = ?, end_time = ? where id = ?''' % self.table_str, (event['id'], event['time'], self.current_dict[key]))
+            conn_execute(self.conn, '''update %s set end_event_id = ? where id = ?''' % self.table_str, (event['id'], self.current_dict[key]))
             del self.current_dict[key]
         
     def get(self, event=None, key=None, value=None):
@@ -187,10 +295,11 @@ class DurationManager(object):
         return ret
     
     def close(self, event):
-        for key in self.current_dict:
-            self.remove(key, event)
+        for key in list(self.current_dict):
+            self.remove(event, key)
             
         conn_execute(self.conn, '''delete from %s where start_event_id = end_event_id''' % self.table_str)
+        self.conn.commit()
         
 class DataRun(object):
     runner_dict = {}
@@ -203,8 +312,21 @@ class DataRun(object):
         
         self.prereq_list = prereq_list
         self.table_list = table_list
+
+        #try:
+        #    import inspect
+        #    print inspect.getsource(self.__class__)
+        #    
+        #    import hashlib
+        #    
+        #    hashlib.new('md5', inspect.getsource(self.__class__)).hexdigest()
+        #    #print dir(self.__class__)
+        #    #print self.__class__.__file__
+        #except Exception, e:
+        #    print e
+            
         
-        self.version = 0
+        self.version = hashlib.new('md5', inspect.getsource(self.__class__)).hexdigest()
         self.retcode = 0
         
     def getAllPrereqs(self):
@@ -228,13 +350,40 @@ class DataRun(object):
     def main(self, sys_argv):
         self.usage(sys_argv)
         try:
-            conn = sqlite_connection(self.options)
+            conn = sqlite_connection(self.options.db_path)
+            
+            if self.options.bigmem:
+                print datetime.datetime.now(), "Starting disk --> memory DB load..."
+                memory_conn = sqlite_connection(':memory:')
+                
+                for sql_str in conn.iterdump():
+                    try:
+                    #print sql_str
+                        memory_conn.execute(sql_str)
+                    except:
+                        print sql_str
+                conn.close()
+                conn = memory_conn
+                print datetime.datetime.now(), "Finished disk --> memory DB load."
+                
 
             conn_execute(conn, '''create table if not exists run (id integer primary key, time timestamp, mostRecent integer default 0, version, name str)''')
 
             for prereq in self.getAllPrereqs():
                 prereq.execute(conn, self.options)
-            self.execute(conn, self.options)
+            self.execute(conn, self.options, True)
+
+            if self.options.bigmem:
+                print datetime.datetime.now(), "Starting memory --> disk DB dump..."
+                disk_conn = sqlite_connection(self.options.db_path)
+                
+                for sql_str in conn.iterdump():
+                    #print sql_str
+                    disk_conn.execute(sql_str)
+                #conn.close()
+                #conn = memory_conn
+                print datetime.datetime.now(), "Finished memory --> disk DB dump..."
+
     
         finally:
             sqlite_print_perf(self.options.verbose)
@@ -271,7 +420,7 @@ class DataRun(object):
 
 
     
-    def execute(self, conn, options):
+    def execute(self, conn, options, isMain=False):
         self.conn = conn
         #print datetime.datetime.now(), "execute", self.name
         
@@ -281,7 +430,7 @@ class DataRun(object):
         #for prereq in self.prereq_list:
         #    self.runner_dict[prereq].execute(self.conn, self.options)
             
-        if self.needsRun(options):
+        if self.needsRun(options) or isMain:
             self.cleanup()
             n = datetime.datetime.now()
             print datetime.datetime.now(), "Starting: %s..." % self.name
@@ -292,7 +441,7 @@ class DataRun(object):
             conn_execute(self.conn, '''insert into run (time, mostRecent, version, name) values (?,?,?,?)''', (datetime.datetime.now(), True, self.version, self.name))
             self.conn.commit()
             
-            self.alreadyRan = True
+            #self.alreadyRan = True
     
     def impl(self, options):
         pass
@@ -310,6 +459,14 @@ class DataRun(object):
             prereq.usage_setup(parser)
         self.usage_setup(parser)
         
+        parser.add_option("--bigmem"
+                , help="Indicates that several gigabytes of RAM are available locally, all DB operations will be done in-RAM to speed things up."
+                #, metavar="OUTPUT"
+                , dest="bigmem"
+                , action="store_true"
+                #, type="str"
+                #, default="output"
+            )
         parser.add_option("--db"
                 , help="Desired sqlite database output file name."
                 , metavar="OUTPUT"

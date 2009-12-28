@@ -251,10 +251,8 @@ class CombatRun(DataRun):
         #self.version = datetime.datetime.now()
         
     def impl(self, options):
-        basicparse.sqlite_insureColumns(self.conn, 'event', [('combat_id', 'int'), #('segment_id', 'int'), 
-                #('wound_dict', 'json'), ('active_dict', 'json'),
+        basicparse.sqlite_insureColumns(self.conn, 'event', [('combat_id', 'int'),
                 ('absorbType', 'str'), ('absorbName', 'str'),
-                #('healersHealing', 'int default 0'), ('healersDead', 'int default 0'), ('tanksDead', 'int default 0'), ('dpsDead', 'int default 0'), ('wipe', 'int default 0'),
             ])
         
         conn_execute(self.conn, '''drop index if exists ndx_event_combat_time''')
@@ -264,22 +262,7 @@ class CombatRun(DataRun):
         conn_execute(self.conn, '''create index ndx_event_combat_source_time on event (combat_id, sourceType, sourceName, time)''')
         conn_execute(self.conn, '''create index ndx_event_combat_suffix_spell on event (combat_id, suffix, sourceName)''')
         
-        #conn_execute(self.conn, '''drop table if exists combat''')
         conn_execute(self.conn, '''create table combat (id integer primary key, start_event_id, close_event_id, end_event_id, size int, instance, encounter, dps_list json, healer_list json, tank_list json)''')
-    
-        #conn_execute(self.conn, '''drop table if exists segment''')
-        #conn_execute(self.conn, '''create table segment (id integer primary key, start_event_id, close_event_id, end_event_id, combat_id)''')
-    
-        #conn_execute(self.conn, '''drop table if exists actor''')
-        #conn_execute(self.conn, '''create table actor (id integer primary key, actorType, actorName, class)''')
-    
-        #conn_execute(self.conn, '''drop table if exists auralist''')
-        #conn_execute(self.conn, '''drop table if exists aura''')
-        #conn_execute(self.conn, '''create table aura (id integer primary key, start_event_id int, end_event_id int, start_time timestamp, end_time timestamp, sourceType str, sourceName str, destType str, destName str, spellName str, spellId int)''')
-        #conn_execute(self.conn, '''create index ndx_aura_time on aura (start_time, end_time, spellName, destName)''')
-        #conn_execute(self.conn, '''create index ndx_aura_name_time on aura (spellName, start_time, end_time, destName)''')
-        #conn_execute(self.conn, '''create index ndx_aura_dest on aura (destType, destName, spellName, start_time, end_time)''')
-        #conn_execute(self.conn, '''create index ndx_aura_id on aura (start_event_id)''')
         self.conn.commit()
         
         
@@ -367,7 +350,7 @@ class FakeDeathRun(DataRun):
         DataRun.__init__(self, ['ParseRun'], [])
         
     def impl(self, options):
-        print datetime.datetime.now(), "Flagging fake deaths..."
+        #print datetime.datetime.now(), "Flagging fake deaths..."
         #flagFakeDeaths(self.conn)
         
         sqlite_insureColumns(self.conn, 'event', [('fakeDeath', 'int default 0')])

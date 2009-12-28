@@ -578,6 +578,7 @@ class GraphRun(DataRun):
         
         #print datetime.datetime.now(), "Iterating over combat images..."
         for combat in conn_execute(conn, '''select * from combat order by start_event_id''').fetchall():
+            print datetime.datetime.now(), "Combat %d: %s - %s" % (combat['id'], combat['instance'], combat['encounter'])
             
             time_list = [x['time'] for x in conn_execute(conn, '''select time from event where combat_id = ?''', (combat['id'],)).fetchall()]
             start_dt = min(time_list)
