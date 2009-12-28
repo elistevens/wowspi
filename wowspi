@@ -83,13 +83,16 @@ def usage_setup(parser, **kwargs):
             )
 
 def main(options, arguments):
-    module_str, runner_str = arguments[0].split('.')
-    
-    if options.profile_path:
-        import cProfile
-        cProfile.runctx('''getattr(__import__(module_str), runner_str)().main(arguments[1:])''', globals(), locals(), options.profile_path)
+    if not arguments:
+        usage(['--help'])
     else:
-        getattr(__import__(module_str), runner_str)().main(arguments[1:])
+        module_str, runner_str = arguments[0].split('.')
+        
+        if options.profile_path:
+            import cProfile
+            cProfile.runctx('''getattr(__import__(module_str), runner_str)().main(arguments[1:])''', globals(), locals(), options.profile_path)
+        else:
+            getattr(__import__(module_str), runner_str)().main(arguments[1:])
     
 
 if __name__ == "__main__":

@@ -1,3 +1,11 @@
+Quick Start
+===========
+
+Wowspi uses a launcher to set sys.path, etc:
+
+$ ./wowspi --help
+$ ./wowspi activitygraph.GraphRun --help
+
 Installing
 ==========
 
