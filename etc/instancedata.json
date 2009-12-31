@@ -389,5 +389,28 @@
                 }
             }
         }
+    },
+    "Icecrown Citadel": {
+        "Lord Marrowgar": {
+            "boss": ["Lord Marrowgar"],
+            "mobs": [],
+            "execution": {
+            },
+            "stasis": "marrowgar"
+        },
+        "Lady Deathwhisper": {
+            "boss": ["Lady Deathwhisper"],
+            "mobs": [],
+            "execution": {
+            },
+            "stasis": "deathwhisper"
+        },
+        "Deathbringer Saurfang": {
+            "boss": ["Deathbringer Saurfang"],
+            "mobs": [],
+            "execution": {
+            },
+            "stasis": "saurfang"
+        }
     }
 }
