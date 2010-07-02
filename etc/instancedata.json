@@ -411,6 +411,25 @@
             "execution": {
             },
             "stasis": "saurfang"
+        },
+        "Rotface": {
+            "boss": ["Rotface"],
+            "mobs": [],
+            "execution": {
+            }
+        },
+        "Festergut": {
+            "boss": ["Festergut"],
+            "mobs": [],
+            "execution": {
+            }
+        },
+        "Professor Putricide": {
+            "boss": ["Professor Putricide"],
+            "mobs": [],
+            "execution": {
+            },
+            "stasis": "putricide"
         }
     }
 }

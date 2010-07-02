@@ -98,3 +98,5 @@ On the author's Mac Pro, parsing 4 hours of 10s raiding took about 20 minutes
 from start to finish and peaked at around 60MB of RAM consumed (this includes
 a full stasis parse).  Only very casual performance optimization has been
 performed; in particular, DB use could be improved.
+
+
